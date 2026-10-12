@@ -42,7 +42,14 @@ python -m http.server 8000
 
 ## 公開（GitHub Pages）
 
-`.github/workflows/pages.yml` が `site/` を GitHub Pages に公開する。リポジトリの Settings → Pages → Source を「GitHub Actions」にする。
+公開先: https://cbox360.github.io/aion2-pet-tracker/
+
+GitHub Pages は `gh-pages` ブランチ（`site/` の中身だけを切り出したもの）を配信している。`site/` を更新したら main にコミットしてから:
+
+```sh
+git subtree split --prefix site -b gh-pages
+git push origin main gh-pages
+```
 
 ## データの出典とライセンス
 
