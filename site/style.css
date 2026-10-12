@@ -36,6 +36,8 @@ h2 { font-size: 1.05rem; margin: 1.6rem 0 .3rem; }
 }
 .top h1 { font-size: 1.15rem; margin: 0; letter-spacing: .02em; }
 .progress { margin: 0; color: var(--muted); font-size: .9em; }
+.settings { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.check.small { font-size: .82em; color: var(--muted); }
 .faction { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
 .faction button { background: transparent; border: 0; padding: 6px 18px; cursor: pointer; color: var(--muted); }
 .faction button[aria-checked="true"][data-faction="light"] { background: color-mix(in srgb, var(--light) 25%, transparent); color: #fff; }
@@ -123,6 +125,7 @@ textarea { width: 100%; background: var(--panel); border: 1px solid var(--line);
 .credits p { margin: .3em 0; }
 
 @media (max-width: 520px) {
+  .settings { align-items: flex-start; }
   main { padding: 10px 12px 20px; }
   .pets { grid-template-columns: 1fr; }
 }
