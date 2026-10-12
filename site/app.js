@@ -49,20 +49,24 @@ let state = loadState();
 const ui = { tab: "pets", typeFilter: new Set(), mapFocus: null, world: null };
 
 function loadState() {
-  const empty = { faction: "light", souls: {}, typeLv: {} };
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-    if (s && typeof s === "object") return { ...empty, ...s };
+    if (s && typeof s === "object") return normalizeState(s);
   } catch (_) { /* 保存できない環境では初期状態で動かす */ }
-  return empty;
+  return normalizeState({});
+}
+
+// 旧形式（souls: 魂の個数）は 5 個以上を収集済みとして読み替える
+function normalizeState(s) {
+  const done = { ...(s.done || {}) };
+  for (const [slug, n] of Object.entries(s.souls || {})) if (n >= 5) done[slug] = true;
+  return { faction: s.faction === "dark" ? "dark" : "light", done, typeLv: s.typeLv || {} };
 }
 function saveState() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) { /* noop */ }
 }
 
-const soulsOf = (p) => Math.min(state.souls[p.slug] || 0, p.souls);
-const isDone = (p) => soulsOf(p) >= p.souls;
-const remaining = (p) => p.souls - soulsOf(p);
+const isDone = (p) => !!state.done[p.slug];
 
 // ---------------------------------------------------------------- データ整形
 
@@ -111,7 +115,7 @@ function renderHeader() {
   const done = DATA.pets.filter(isDone).length;
   const avail = DATA.pets.filter((p) => petAvailable(p, state.faction));
   const availDone = avail.filter(isDone).length;
-  $("#progress").textContent = `獲得 ${done} / ${DATA.pets.length} ・ ${FACTION_NAME[state.faction]}で魂が出るペット ${availDone} / ${avail.length}`;
+  $("#progress").textContent = `収集済み ${done} / ${DATA.pets.length} ・ ${FACTION_NAME[state.faction]}で魂が出るペット ${availDone} / ${avail.length}`;
   document.querySelectorAll(".faction button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.faction === state.faction)));
 }
 
@@ -157,10 +161,6 @@ function zoneSummary(m) {
 }
 
 function petCard(p) {
-  const have = soulsOf(p);
-  const pips = Array.from({ length: p.souls }, (_, i) =>
-    `<button type="button" class="pip ${i < have ? "on" : ""}" data-pet="${esc(p.slug)}" data-n="${i + 1}" aria-label="魂 ${i + 1} 個"></button>`
-  ).join("");
   const drops = p.drops
     .map((d) => {
       const m = DATA.monsters[d.monster];
@@ -182,16 +182,17 @@ function petCard(p) {
     .filter(([k]) => otherKeys[k])
     .map(([k, n]) => `${otherKeys[k]} ${n}件`)
     .join("・");
-  return `<article class="pet ${isDone(p) ? "done" : ""}">
+  return `<article class="pet ${isDone(p) ? "done" : ""}" data-pet="${esc(p.slug)}">
     <div class="pet-head">
-      <a class="pet-name" href="${METABOT}/mounts/${esc(p.slug)}" target="_blank" rel="noopener">${esc(p.name)}</a>
+      <label class="got"><input type="checkbox" class="got-check" ${isDone(p) ? "checked" : ""}>
+        <span class="pet-name">${esc(p.name)}</span></label>
       <span class="pet-type t-${p.type}">${TYPE_NAME[p.type]}</span>
     </div>
-    <div class="pips">${pips}<span class="pip-label">${isDone(p) ? "獲得済み" : `あと ${remaining(p)}`}</span></div>
     <details>
       <summary>魂を落とすモンスター（${p.drops.length}）</summary>
       <ul class="drops">${drops || '<li class="other">モンスタードロップなし</li>'}
-        ${others ? `<li class="other">ほかの入手方法: ${others}（<a href="${METABOT}/mounts/${esc(p.slug)}" target="_blank" rel="noopener">詳細</a>）</li>` : ""}
+        ${others ? `<li class="other">ほかの入手方法: ${others}</li>` : ""}
+        <li class="other"><a href="${METABOT}/mounts/${esc(p.slug)}" target="_blank" rel="noopener">MetaBot.GG で詳細を見る</a></li>
       </ul>
     </details>
   </article>`;
@@ -300,7 +301,7 @@ function levelRange(mons) {
 function petTags(pets) {
   return [...pets]
     .sort((a, b) => a.name.localeCompare(b.name, "ja"))
-    .map((p) => `<span class="tag"><span class="dot bg-${p.type}"></span> ${esc(p.name)} あと${remaining(p)}</span>`)
+    .map((p) => `<span class="tag"><span class="dot bg-${p.type}"></span> ${esc(p.name)}</span>`)
     .join("");
 }
 
@@ -415,7 +416,7 @@ function drawPoints() {
 
 function monsterPopup(m) {
   const pets = m.pets
-    .map((x) => `<div><span class="dot bg-${x.pet.type}"></span> ${esc(x.pet.name)} <span class="muted">${isDone(x.pet) ? "獲得済み" : `あと${remaining(x.pet)}`}</span></div>`)
+    .map((x) => `<div><span class="dot bg-${x.pet.type}"></span> ${esc(x.pet.name)} <span class="muted">${isDone(x.pet) ? "収集済み" : "未収集"}</span></div>`)
     .join("");
   const zones = zoneSummary(m).filter((z) => !z.off).map((z) => esc(z.name)).join("、");
   return `<strong><a href="${METABOT}/monsters/${esc(m.slug)}" target="_blank" rel="noopener">${esc(m.name)}</a></strong> Lv.${m.level ?? "?"}
@@ -457,8 +458,8 @@ function importState() {
   try {
     const raw = $("#backup").value.trim();
     const s = JSON.parse(raw.startsWith("{") ? raw : decodeURIComponent(escape(atob(raw))));
-    if (!s || typeof s.souls !== "object") throw new Error("bad");
-    state = { faction: s.faction === "dark" ? "dark" : "light", souls: s.souls, typeLv: s.typeLv || {} };
+    if (!s || (typeof s.done !== "object" && typeof s.souls !== "object")) throw new Error("bad");
+    state = normalizeState(s);
     saveState();
     renderHeader();
     $("#data-msg").textContent = "読み込みました。";
@@ -476,7 +477,7 @@ function resetState() {
     return;
   }
   resetArmed = false;
-  state = { faction: state.faction, souls: {}, typeLv: {} };
+  state = normalizeState({ faction: state.faction });
   saveState();
   $("#reset").textContent = "記録をすべて消す";
   renderHeader();
@@ -500,19 +501,16 @@ function bind() {
   });
 
   $("#pets").addEventListener("click", (e) => {
-    const pip = e.target.closest(".pip");
-    if (pip) {
-      const n = +pip.dataset.n;
-      const cur = state.souls[pip.dataset.pet] || 0;
-      state.souls[pip.dataset.pet] = cur === n ? n - 1 : n;
-      if (!state.souls[pip.dataset.pet]) delete state.souls[pip.dataset.pet];
+    if (e.target.classList.contains("got-check")) {
+      // カードはその場に残す（「未完了のみ」でもすぐには消さず、絞り込みを変えたときに反映）
+      const card = e.target.closest(".pet");
+      const slug = card.dataset.pet;
+      if (e.target.checked) state.done[slug] = true;
+      else delete state.done[slug];
       saveState();
-      const open = [...document.querySelectorAll("#pets details[open]")].map((d) => d.closest(".pet").querySelector(".pet-name").textContent);
+      card.classList.toggle("done", e.target.checked);
       renderHeader();
-      renderPets();
-      document.querySelectorAll("#pets .pet").forEach((el) => {
-        if (open.includes(el.querySelector(".pet-name").textContent)) el.querySelector("details").open = true;
-      });
+      renderTypeLevels();
       return;
     }
     const mb = e.target.closest("[data-map-monster]");
