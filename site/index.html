@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AION2 ペット収集トラッカー</title>
+<meta name="description" content="AION2 のペット（魂）収集状況を記録し、未完了ペットの魂を落とすモンスターの湧き位置と効率のいい狩場を表示します。">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>AION2 ペット収集トラッカー</h1>
+    <p class="progress" id="progress"></p>
+  </div>
+  <div class="faction" role="radiogroup" aria-label="陣営">
+    <button type="button" data-faction="light" role="radio">天族</button>
+    <button type="button" data-faction="dark" role="radio">魔族</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button type="button" role="tab" data-tab="pets">図鑑</button>
+  <button type="button" role="tab" data-tab="spots">おすすめ狩場</button>
+  <button type="button" role="tab" data-tab="map">マップ</button>
+  <button type="button" role="tab" data-tab="data">データ管理</button>
+</nav>
+
+<main>
+  <!-- 図鑑 -->
+  <section id="tab-pets" class="tab" hidden>
+    <div class="typelv" id="typelv"></div>
+    <div class="filters">
+      <input type="search" id="q" placeholder="ペット名・モンスター名で検索">
+      <div class="chips" id="type-chips"></div>
+      <label class="check"><input type="checkbox" id="only-todo" checked> 未完了のみ</label>
+      <label class="check"><input type="checkbox" id="only-faction" checked> この陣営で魂が出るものだけ</label>
+    </div>
+    <p class="hint">魂の数はマスをクリックして記録します（5個で獲得）。記録はこのブラウザにだけ保存されます。</p>
+    <div class="pets" id="pets"></div>
+  </section>
+
+  <!-- おすすめ狩場 -->
+  <section id="tab-spots" class="tab" hidden>
+    <h2>密集スポット</h2>
+    <p class="hint">未完了ペットの魂を落とすモンスターが近くにまとまっている場所です。範囲内で狙えるペットの種類が多い順に並べています。</p>
+    <div class="range">
+      <label for="radius">範囲</label>
+      <input type="range" id="radius" min="50" max="400" step="25" value="150">
+      <span id="radius-label"></span>
+    </div>
+    <ol class="spots" id="hotspots"></ol>
+    <h2>ゾーン別</h2>
+    <p class="hint">ゾーン内で魂が手に入る未完了ペットの数が多い順です。</p>
+    <div class="table-wrap"><table class="zones" id="zones"></table></div>
+  </section>
+
+  <!-- マップ -->
+  <section id="tab-map" class="tab" hidden>
+    <div class="map-bar">
+      <select id="world"></select>
+      <span id="map-filter"></span>
+      <label class="check"><input type="checkbox" id="show-hot" checked> 密集スポットを表示</label>
+    </div>
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- データ管理 -->
+  <section id="tab-data" class="tab" hidden>
+    <h2>バックアップ</h2>
+    <p class="hint">記録はこのブラウザの中だけに保存されます。別の端末やブラウザに移すときは、下の文字列をコピーして貼り付けてください。</p>
+    <textarea id="backup" rows="6" spellcheck="false"></textarea>
+    <div class="buttons">
+      <button type="button" id="export">現在の記録を表示</button>
+      <button type="button" id="import">貼り付けた記録を読み込む</button>
+      <button type="button" id="reset" class="danger">記録をすべて消す</button>
+    </div>
+    <p id="data-msg" class="msg" role="status"></p>
+  </section>
+</main>
+
+<footer class="credits">
+  <p>ペット・モンスター・湧き位置データ: <a href="https://metabot.gg/en/aion-2">MetaBot.GG</a>（AION 2 グローバル版クライアントのデータ）。各ペット・モンスターの元ページへのリンクも掲載しています。</p>
+  <p>地図画像: <a href="https://github.com/aion2-interactive-map/aion2-interactive-map">aion2-interactive-map</a>（CC BY-NC 4.0。ベルテロン・アルトガルド・エレシュランタ下層）、<a href="https://metabot.gg/en/aion-2/map">MetaBot.GG</a>（エルテネン・モルヘイム・エレシュランタ中層/表層）。</p>
+  <p>AION 2 は NCSOFT の商標です。本サイトは非公式のファンサイトで、NCSOFT・MetaBot.GG とは関係ありません。<span id="built"></span></p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
