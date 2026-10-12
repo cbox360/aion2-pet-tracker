@@ -23,8 +23,9 @@ const WORLDS = {
   world_d_a: { tiles: [8, 8], zoom: 4, faction: "dark", order: 1 },
   world_d_b: { tiles: [1, 1], zoom: 3, faction: "dark", order: 2 },
   abyss_reshanta_a: { tiles: [4, 4], zoom: 4, faction: "abyss", order: 10 },
-  abyss_reshanta_c: { tiles: [1, 1], zoom: 1, faction: "abyss", order: 11 },
-  abyss_reshanta_d: { tiles: [1, 1], zoom: 1, faction: "abyss", order: 12 },
+  // 中層・表層はグローバル版で未開放の可能性があるため、既定では対象外（設定で含められる）
+  abyss_reshanta_c: { tiles: [1, 1], zoom: 1, faction: "abyss", order: 11, unreleased: true },
+  abyss_reshanta_d: { tiles: [1, 1], zoom: 1, faction: "abyss", order: 12, unreleased: true },
 };
 // 湧き点の距離計算用: 1 ワールド全体の大きさ（元タイル 1024px 換算）
 const WORLD_PX = { world_l_a: 8192, world_l_b: 8192, world_d_a: 8192, world_d_b: 8192, abyss_reshanta_a: 4096, abyss_reshanta_c: 2048, abyss_reshanta_d: 2048 };
@@ -38,6 +39,7 @@ const worldSide = (w) => {
 };
 const worldFaction = (w) => WORLDS[w]?.faction || (w.startsWith("world_l") ? "light" : w.startsWith("world_d") ? "dark" : "abyss");
 const inFaction = (w, f) => {
+  if (WORLDS[w]?.unreleased && !state.includeUnreleased) return false;
   const wf = worldFaction(w);
   return wf === f || wf === "abyss";
 };
@@ -60,7 +62,7 @@ function loadState() {
 function normalizeState(s) {
   const done = { ...(s.done || {}) };
   for (const [slug, n] of Object.entries(s.souls || {})) if (n >= 5) done[slug] = true;
-  return { faction: s.faction === "dark" ? "dark" : "light", done, typeLv: s.typeLv || {} };
+  return { faction: s.faction === "dark" ? "dark" : "light", done, typeLv: s.typeLv || {}, includeUnreleased: !!s.includeUnreleased };
 }
 function saveState() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) { /* noop */ }
@@ -117,6 +119,7 @@ function renderHeader() {
   const availDone = avail.filter(isDone).length;
   $("#progress").textContent = `収集済み ${done} / ${DATA.pets.length} ・ ${FACTION_NAME[state.faction]}で魂が出るペット ${availDone} / ${avail.length}`;
   document.querySelectorAll(".faction button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.faction === state.faction)));
+  $("#include-unreleased").checked = state.includeUnreleased;
 }
 
 function showTab(tab) {
@@ -491,6 +494,12 @@ function bind() {
     const f = e.target.closest("button")?.dataset.faction;
     if (!f || f === state.faction) return;
     state.faction = f;
+    ui.mapFocus = null;
+    saveState();
+    renderAll();
+  });
+  $("#include-unreleased").addEventListener("change", (e) => {
+    state.includeUnreleased = e.target.checked;
     ui.mapFocus = null;
     saveState();
     renderAll();

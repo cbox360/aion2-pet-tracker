@@ -14,9 +14,14 @@
     <h1>AION2 ペット収集トラッカー</h1>
     <p class="progress" id="progress"></p>
   </div>
-  <div class="faction" role="radiogroup" aria-label="陣営">
-    <button type="button" data-faction="light" role="radio">天族</button>
-    <button type="button" data-faction="dark" role="radio">魔族</button>
+  <div class="settings">
+    <div class="faction" role="radiogroup" aria-label="陣営">
+      <button type="button" data-faction="light" role="radio">天族</button>
+      <button type="button" data-faction="dark" role="radio">魔族</button>
+    </div>
+    <label class="check small" title="グローバル版ではまだ行けない可能性があるため、既定では対象外にしています">
+      <input type="checkbox" id="include-unreleased"> エレシュランタ中層・表層も含める
+    </label>
   </div>
 </header>
 
