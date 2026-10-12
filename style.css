@@ -68,14 +68,12 @@ main { padding: 12px 16px 24px; max-width: 1200px; margin: 0 auto; }
 .pets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
 .pet { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .pet.done { opacity: .6; }
-.pet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pet-name { font-weight: 600; }
 .pet-type { font-size: .8em; }
-.pips { display: flex; gap: 4px; margin: 8px 0 4px; align-items: center; }
-.pip { width: 26px; height: 18px; border-radius: 4px; border: 1px solid var(--line); background: var(--panel-2); cursor: pointer; padding: 0; }
-.pip.on { background: var(--accent); border-color: var(--accent); }
-.pet.done .pip.on { background: var(--done); border-color: var(--done); }
-.pip-label { margin-left: 6px; color: var(--muted); font-size: .85em; }
+.got { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.got-check { width: 18px; height: 18px; accent-color: var(--done); cursor: pointer; flex: none; }
+.pet.done .pet-name { text-decoration: line-through; text-decoration-color: var(--muted); }
 .pet details { margin-top: 4px; }
 .pet summary { cursor: pointer; color: var(--muted); font-size: .9em; }
 .drops { list-style: none; margin: 6px 0 0; padding: 0; font-size: .9em; }
@@ -127,5 +125,4 @@ textarea { width: 100%; background: var(--panel); border: 1px solid var(--line);
 @media (max-width: 520px) {
   main { padding: 10px 12px 20px; }
   .pets { grid-template-columns: 1fr; }
-  .pip { width: 22px; }
 }
