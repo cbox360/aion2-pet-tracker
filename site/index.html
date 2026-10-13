@@ -40,8 +40,12 @@
       <input type="search" id="q" placeholder="ペット名・モンスター名で検索">
       <div class="chips" id="type-chips"></div>
       <label class="check"><input type="checkbox" id="only-todo" checked> 未完了のみ</label>
-      <label class="check"><input type="checkbox" id="only-faction" checked> この陣営で魂が出るものだけ</label>
-      <label class="check"><input type="checkbox" id="only-rift"> 亀裂限定のみ</label>
+      <div class="where-filter" role="radiogroup" aria-label="入手場所">
+        <span class="where-label">入手場所</span>
+        <label><input type="radio" name="where" value="all"> すべて</label>
+        <label><input type="radio" name="where" value="own" checked> 自陣営で取れる</label>
+        <label><input type="radio" name="where" value="rift"> 亀裂限定</label>
+      </div>
     </div>
     <p class="hint">集め終わったペットにチェックを入れてください。記録はこのブラウザにだけ保存されます。</p>
     <div class="pets" id="pets"></div>
