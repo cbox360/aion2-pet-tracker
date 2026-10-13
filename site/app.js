@@ -110,6 +110,16 @@ function monsterInFaction(m, f) {
   return m.spawnMaps.some((s) => inFaction(s.world, f)) || m.zones.some((z) => z.world && inFaction(z.world, f));
 }
 const petAvailable = (p, f) => p.drops.some((d) => monsterInFaction(DATA.monsters[d.monster], f));
+const opposite = (f) => (f === "light" ? "dark" : "light");
+
+// 自陣営（深淵を含む）では魂が出ず、相手陣営の地域でだけ出る ＝ 亀裂で狙うべきペット
+const isRiftOnly = (p) => !petAvailable(p, state.faction) && petAvailable(p, opposite(state.faction));
+const isRiftWorld = (w) => worldFaction(w) === opposite(state.faction);
+
+function petSideLabel(p) {
+  const l = petAvailable(p, "light"), d = petAvailable(p, "dark");
+  return l && d ? "両陣営" : l ? "天族側のみ" : d ? "魔族側のみ" : "";
+}
 
 // ---------------------------------------------------------------- ヘッダー・タブ
 
@@ -117,7 +127,8 @@ function renderHeader() {
   const done = DATA.pets.filter(isDone).length;
   const avail = DATA.pets.filter((p) => petAvailable(p, state.faction));
   const availDone = avail.filter(isDone).length;
-  $("#progress").textContent = `収集済み ${done} / ${DATA.pets.length} ・ ${FACTION_NAME[state.faction]}で魂が出るペット ${availDone} / ${avail.length}`;
+  const rift = DATA.pets.filter((p) => isRiftOnly(p) && !isDone(p)).length;
+  $("#progress").textContent = `収集済み ${done} / ${DATA.pets.length} ・ ${FACTION_NAME[state.faction]}で魂が出るペット ${availDone} / ${avail.length} ・ 亀裂限定（未収集） ${rift}`;
   document.querySelectorAll(".faction button").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.faction === state.faction)));
   $("#include-unreleased").checked = state.includeUnreleased;
 }
@@ -168,15 +179,18 @@ function petCard(p) {
     .map((d) => {
       const m = DATA.monsters[d.monster];
       const off = !monsterInFaction(m, state.faction);
+      const riftMap = off && m.spawnMaps.some((s) => isRiftWorld(s.world) && s.points.length);
+      // 亀裂で行ける相手陣営のモンスターは薄くしない
       const zones = zoneSummary(m)
-        .map((z) => `<span class="${z.off ? "off" : ""}">${esc(z.name)}（${esc(z.map)}・${z.spawns}）</span>`)
+        .map((z) => `<span class="${z.off && !(z.world && isRiftWorld(z.world)) ? "off" : ""}">${esc(z.name)}（${esc(z.map)}${z.world && isRiftWorld(z.world) ? "・亀裂" : ""}・${z.spawns}）</span>`)
         .join("、");
-      return `<li class="${off ? "off" : ""}">
+      return `<li class="${off && !riftMap ? "off" : ""}">
         <a href="${METABOT}/monsters/${esc(m.slug)}" target="_blank" rel="noopener">${esc(m.name)}</a>
         Lv.${m.level ?? "?"} ${m.rank && m.rank !== "ノーマル" ? `<span class="tag">${esc(m.rank)}</span>` : ""}
         ${d.chance != null && d.chance < 100 ? `<span class="tag">${d.chance}%</span>` : ""}
         <div class="where">${zones || "湧き情報なし（ダンジョン等）"}</div>
         ${m.spawnMaps.some((s) => s.points.length) && !off ? `<button type="button" class="linkbtn" data-map-monster="${esc(m.slug)}">マップで見る</button>` : ""}
+        ${riftMap ? `<button type="button" class="linkbtn" data-map-monster="${esc(m.slug)}">マップで見る（亀裂）</button>` : ""}
       </li>`;
     })
     .join("");
@@ -185,11 +199,12 @@ function petCard(p) {
     .filter(([k]) => otherKeys[k])
     .map(([k, n]) => `${otherKeys[k]} ${n}件`)
     .join("・");
-  return `<article class="pet ${isDone(p) ? "done" : ""}" data-pet="${esc(p.slug)}">
+  const rift = isRiftOnly(p);
+  return `<article class="pet ${isDone(p) ? "done" : ""} ${rift ? "rift" : ""}" data-pet="${esc(p.slug)}">
     <div class="pet-head">
       <label class="got"><input type="checkbox" class="got-check" ${isDone(p) ? "checked" : ""}>
         <span class="pet-name">${esc(p.name)}</span></label>
-      <span class="pet-type t-${p.type}">${TYPE_NAME[p.type]}</span>
+      <span class="pet-badges">${rift ? '<span class="badge-rift" title="自陣営では魂が出ず、相手陣営の地域でだけ出ます">亀裂限定</span>' : ""}<span class="pet-type t-${p.type}">${TYPE_NAME[p.type]}</span></span>
     </div>
     <details>
       <summary>魂を落とすモンスター（${p.drops.length}）</summary>
@@ -207,10 +222,11 @@ function renderPets() {
   const q = $("#q").value.trim().toLowerCase();
   const onlyTodo = $("#only-todo").checked;
   const onlyFaction = $("#only-faction").checked;
+  const onlyRift = $("#only-rift").checked;
   const list = DATA.pets.filter((p) => {
     if (onlyTodo && isDone(p)) return false;
     if (ui.typeFilter.size && !ui.typeFilter.has(p.type)) return false;
-    if (onlyFaction && !petAvailable(p, state.faction)) return false;
+    if (onlyRift ? !isRiftOnly(p) : onlyFaction && !petAvailable(p, state.faction)) return false;
     if (q) {
       const hay = [p.name, p.slug, ...p.drops.map((d) => DATA.monsters[d.monster].name)].join(" ").toLowerCase();
       if (!hay.includes(q)) return false;
@@ -222,14 +238,19 @@ function renderPets() {
 
 // ---------------------------------------------------------------- 狩場の計算
 
-// 未完了ペットの魂を落とすモンスターの湧き点（選択陣営で行けるワールドのみ）
-function targetPoints() {
+// 未完了ペットの魂を落とすモンスターの湧き点
+//   mode "own":  選択陣営で行けるワールド（自陣営＋深淵）
+//   mode "rift": 相手陣営のワールドで、亀裂限定ペットの分だけ
+//   mode "all":  相手陣営も含むすべて（亀裂マップの表示用）
+function targetPoints(mode = "own") {
   const byWorld = {};
   for (const m of Object.values(DATA.monsters)) {
-    const pets = m.pets.filter((x) => !isDone(x.pet));
+    const pets = m.pets.filter((x) => !isDone(x.pet) && (mode !== "rift" || isRiftOnly(x.pet)));
     if (!pets.length) continue;
     for (const sm of m.spawnMaps) {
-      if (!inFaction(sm.world, state.faction)) continue;
+      if (WORLDS[sm.world]?.unreleased && !state.includeUnreleased) continue;
+      if (mode === "own" && !inFaction(sm.world, state.faction)) continue;
+      if (mode === "rift" && !isRiftWorld(sm.world)) continue;
       const arr = (byWorld[sm.world] ||= []);
       for (const [x, y] of sm.points) arr.push({ x, y, m, pets });
     }
@@ -238,9 +259,9 @@ function targetPoints() {
 }
 
 // 範囲内の「狙える未完了ペットの種類数」が多い地点を、重ならないように選ぶ
-function computeHotspots(radiusPx, limit = 12) {
+function computeHotspots(radiusPx, limit = 12, byWorld = targetPoints("own")) {
   const result = [];
-  for (const [world, pts] of Object.entries(targetPoints())) {
+  for (const [world, pts] of Object.entries(byWorld)) {
     const r = radiusPx / (WORLD_PX[world] || 8192);
     const cell = r;
     const grid = new Map();
@@ -285,10 +306,10 @@ function computeHotspots(radiusPx, limit = 12) {
   return result.slice(0, limit);
 }
 
-function mainZone(mons) {
+function mainZone(mons, world) {
   const count = {};
   for (const m of mons) {
-    const z = zoneSummary(m).find((z) => !z.off);
+    const z = world ? m.zones.find((z) => z.world === world) : zoneSummary(m).find((z) => !z.off);
     if (z) count[z.name] = (count[z.name] || 0) + 1;
   }
   return Object.entries(count).sort((a, b) => b[1] - a[1]).map(([n]) => n).slice(0, 2).join(" / ");
@@ -311,18 +332,24 @@ function petTags(pets) {
 function renderSpots() {
   const radius = +$("#radius").value;
   $("#radius-label").textContent = radius <= 100 ? "狭い" : radius >= 250 ? "広い" : "ふつう";
-  const spots = computeHotspots(radius);
-  $("#hotspots").innerHTML = spots.length
-    ? spots.map((s, i) => `<li>
+  const spotItems = (spots, kind) => spots.map((s, i) => `<li>
         <div class="spot-title">
-          <strong>${esc(mainZone(s.mons) || "不明なゾーン")}</strong>
+          <strong>${esc(mainZone(s.mons, s.world) || "不明なゾーン")}</strong>
           <span class="spot-meta">${esc(worldName[s.world] || s.world)} ・ ペット${s.pets.size}種 ・ 湧き${s.ns.length}か所 ・ ${levelRange(s.mons)}</span>
-          <button type="button" class="linkbtn" data-map-spot="${i}">マップで見る</button>
+          <button type="button" class="linkbtn" data-map-spot="${kind}:${i}">マップで見る</button>
         </div>
         <div class="tags">${petTags(s.pets)}</div>
-      </li>`).join("")
+      </li>`).join("");
+  const spots = computeHotspots(radius);
+  const riftSpots = computeHotspots(radius, 6, targetPoints("rift"));
+  ui.spotLists = { own: spots, rift: riftSpots };
+  $("#rift-side").textContent = FACTION_NAME[opposite(state.faction)];
+  $("#rift-spots").innerHTML = riftSpots.length
+    ? spotItems(riftSpots, "rift")
+    : '<p class="empty">亀裂でしか取れない未収集ペットはありません。</p>';
+  $("#hotspots").innerHTML = spots.length
+    ? spotItems(spots, "own")
     : '<p class="empty">この陣営で狙える未完了ペットはありません。</p>';
-  ui.lastSpots = spots;
 
   // ゾーン別集計
   const zones = {};
@@ -354,8 +381,10 @@ const toLatLng = (x, y) => [-y * 256, x * 256];
 
 function availableWorlds() {
   const ws = new Set();
-  for (const m of Object.values(DATA.monsters)) for (const s of m.spawnMaps) if (inFaction(s.world, state.faction) && s.points.length) ws.add(s.world);
-  return [...ws].sort((a, b) => (WORLDS[a]?.order ?? 99) - (WORLDS[b]?.order ?? 99));
+  for (const m of Object.values(DATA.monsters))
+    for (const s of m.spawnMaps)
+      if ((inFaction(s.world, state.faction) || isRiftWorld(s.world)) && s.points.length) ws.add(s.world);
+  return [...ws].sort((a, b) => isRiftWorld(a) - isRiftWorld(b) || (WORLDS[a]?.order ?? 99) - (WORLDS[b]?.order ?? 99));
 }
 
 function ensureMap() {
@@ -381,7 +410,11 @@ function renderMap() {
   setTimeout(() => map.invalidateSize(), 0);
   const worlds = availableWorlds();
   if (!worlds.includes(ui.world)) ui.world = worlds[0] || null;
-  $("#world").innerHTML = worlds.map((w) => `<option value="${w}" ${w === ui.world ? "selected" : ""}>${esc(worldName[w] || w)}</option>`).join("");
+  const opt = (w) => `<option value="${w}" ${w === ui.world ? "selected" : ""}>${esc(worldName[w] || w)}${isRiftWorld(w) ? "（亀裂）" : ""}</option>`;
+  const own = worlds.filter((w) => !isRiftWorld(w));
+  const rift = worlds.filter(isRiftWorld);
+  $("#world").innerHTML = own.map(opt).join("") +
+    (rift.length ? `<optgroup label="亀裂（${FACTION_NAME[opposite(state.faction)]}の地域）">${rift.map(opt).join("")}</optgroup>` : "");
   if (!ui.world) return;
   if (!tileLayer || tileLayer._url.indexOf(`/${ui.world}/`) < 0) setWorld(ui.world);
   drawPoints();
@@ -394,41 +427,57 @@ function drawPoints() {
   $("#map-filter").innerHTML = focus
     ? `${esc(DATA.monsters[focus].name)} のみ表示 <button type="button" class="linkbtn" id="clear-focus">解除</button>`
     : "";
-  const pts = (targetPoints()[ui.world] || []).filter((p) => !focus || p.m.slug === focus);
+  const riftMode = isRiftWorld(ui.world);
+  const riftOnlyView = riftMode && $("#rift-only").checked;
+  $("#rift-only-wrap").hidden = !riftMode;
+  let pts = (targetPoints(riftMode ? "all" : "own")[ui.world] || []).filter((p) => !focus || p.m.slug === focus);
+  for (const p of pts) p.prio = riftMode && p.pets.some((x) => isRiftOnly(x.pet));
+  if (riftOnlyView && !focus) pts = pts.filter((p) => p.prio);
+  // 強調する点を上に描く
+  pts.sort((a, b) => a.prio - b.prio);
   if (focus && !pts.length) {
     // 完了済みペットのモンスターでも、絞り込み表示では出す
     const m = DATA.monsters[focus];
     for (const sm of m.spawnMaps) if (sm.world === ui.world) for (const [x, y] of sm.points) pts.push({ x, y, m, pets: m.pets });
   }
   for (const p of pts) {
-    const type = p.pets[0].pet.type;
-    L.circleMarker(toLatLng(p.x, p.y), { radius: 5, color: "#000", weight: 1, fillColor: TYPE_COLOR[type], fillOpacity: 0.9 })
+    const type = (p.pets.find((x) => !riftMode || isRiftOnly(x.pet)) || p.pets[0]).pet.type;
+    const style = !riftMode
+      ? { radius: 5, color: "#000", weight: 1, fillColor: TYPE_COLOR[type], fillOpacity: 0.9 }
+      : p.prio
+        ? { radius: 7, color: "#fff", weight: 2.5, fillColor: TYPE_COLOR[type], fillOpacity: 1 }
+        : { radius: 4, color: "#000", weight: 1, opacity: 0.35, fillColor: TYPE_COLOR[type], fillOpacity: 0.3 };
+    L.circleMarker(toLatLng(p.x, p.y), style)
       .bindPopup(() => monsterPopup(p.m))
       .addTo(pointLayer);
   }
   if ($("#show-hot").checked && !focus) {
-    for (const s of computeHotspots(+$("#radius").value).filter((s) => s.world === ui.world)) {
-      L.circle(toLatLng(s.x, s.y), { radius: s.r * 256, color: "#d9b45a", weight: 2, fill: true, fillOpacity: 0.06, dashArray: "6 4" })
-        .bindPopup(`<strong>${esc(mainZone(s.mons))}</strong><br>ペット${s.pets.size}種 ・ 湧き${s.ns.length}か所<div class="tags">${petTags(s.pets)}</div>`)
+    const hot = computeHotspots(+$("#radius").value, 12, riftMode ? targetPoints("rift") : targetPoints("own"));
+    for (const s of hot.filter((s) => s.world === ui.world)) {
+      L.circle(toLatLng(s.x, s.y), { radius: s.r * 256, color: riftMode ? "#ffffff" : "#d9b45a", weight: 2, fill: true, fillOpacity: 0.06, dashArray: "6 4" })
+        .bindPopup(`<strong>${esc(mainZone(s.mons, s.world))}</strong>${riftMode ? " <span class=\"badge-rift\">亀裂限定</span>" : ""}<br>ペット${s.pets.size}種 ・ 湧き${s.ns.length}か所<div class="tags">${petTags(s.pets)}</div>`)
         .addTo(hotLayer);
     }
   }
+  const riftCount = pts.filter((p) => p.prio).length;
   $("#legend").innerHTML = TYPES.map((t) => `<span><span class="dot bg-${t.id}"></span> ${t.name}</span>`).join("") +
+    (riftMode ? `<span><span class="dot dot-rift"></span> 白枠＝亀裂限定（${FACTION_NAME[state.faction]}側では魂が出ない） ${riftCount}か所</span><span>薄い点＝自陣営でも取れる</span>` : "") +
     `<span>点 ${pts.length}</span>`;
 }
 
 function monsterPopup(m) {
   const pets = m.pets
-    .map((x) => `<div><span class="dot bg-${x.pet.type}"></span> ${esc(x.pet.name)} <span class="muted">${isDone(x.pet) ? "収集済み" : "未収集"}</span></div>`)
+    .map((x) => `<div><span class="dot bg-${x.pet.type}"></span> ${esc(x.pet.name)} ${isRiftOnly(x.pet) ? '<span class="badge-rift">亀裂限定</span> ' : ""}<span class="muted">${petSideLabel(x.pet)} ・ ${isDone(x.pet) ? "収集済み" : "未収集"}</span></div>`)
     .join("");
-  const zones = zoneSummary(m).filter((z) => !z.off).map((z) => esc(z.name)).join("、");
+  const zones = m.zones.filter((z) => z.world === ui.world).map((z) => esc(z.name)).join("、");
   return `<strong><a href="${METABOT}/monsters/${esc(m.slug)}" target="_blank" rel="noopener">${esc(m.name)}</a></strong> Lv.${m.level ?? "?"}
     <div class="muted">${zones}</div>${pets}`;
 }
 
 function focusMonster(slug) {
   const m = DATA.monsters[slug];
-  const world = m.spawnMaps.find((s) => inFaction(s.world, state.faction) && s.points.length)?.world;
+  const world = (m.spawnMaps.find((s) => inFaction(s.world, state.faction) && s.points.length) ||
+    m.spawnMaps.find((s) => isRiftWorld(s.world) && s.points.length))?.world;
   if (!world) return;
   ui.mapFocus = slug;
   ui.world = world;
@@ -438,8 +487,9 @@ function focusMonster(slug) {
   map.fitBounds(L.latLngBounds(pts.map(([x, y]) => toLatLng(x, y))).pad(0.5), { maxZoom: 4 });
 }
 
-function focusSpot(i) {
-  const s = ui.lastSpots?.[i];
+function focusSpot(ref) {
+  const [kind, i] = ref.split(":");
+  const s = ui.spotLists?.[kind]?.[+i];
   if (!s) return;
   ui.mapFocus = null;
   ui.world = s.world;
@@ -543,11 +593,13 @@ function bind() {
   $("#q").addEventListener("input", renderPets);
   $("#only-todo").addEventListener("change", renderPets);
   $("#only-faction").addEventListener("change", renderPets);
+  $("#only-rift").addEventListener("change", renderPets);
+  $("#rift-only").addEventListener("change", drawPoints);
 
   $("#radius").addEventListener("input", renderSpots);
   $("#tab-spots").addEventListener("click", (e) => {
     const b = e.target.closest("[data-map-spot]");
-    if (b) focusSpot(+b.dataset.mapSpot);
+    if (b) focusSpot(b.dataset.mapSpot);
   });
 
   $("#world").addEventListener("change", (e) => {
