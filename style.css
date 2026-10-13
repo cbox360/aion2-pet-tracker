@@ -67,12 +67,17 @@ main { padding: 12px 16px 24px; max-width: 1200px; margin: 0 auto; }
 .bg-fera { background: var(--fera); } .bg-natura { background: var(--natura); } .bg-varian { background: var(--varian); } .bg-cogni { background: var(--cogni); } .bg-special { background: var(--special); }
 
 /* pet cards */
-.pets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.pets { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; align-items: start; }
 .pet { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .pet.done { opacity: .6; }
 .pet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .pet-name { font-weight: 600; }
 .pet-type { font-size: .8em; }
+.pet-badges { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.badge-rift { font-size: .75em; font-weight: 600; color: #111; background: #f2f2f2; border-radius: 4px; padding: 0 6px; white-space: nowrap; }
+.pet.rift { border-color: #8d8d8d; }
+.rift-spots li { border-color: #8d8d8d; }
+.dot-rift { background: transparent; border: 2px solid #fff; }
 .got { display: flex; align-items: center; gap: 8px; cursor: pointer; }
 .got-check { width: 18px; height: 18px; accent-color: var(--done); cursor: pointer; flex: none; }
 .pet.done .pet-name { text-decoration: line-through; text-decoration-color: var(--muted); }

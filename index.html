@@ -41,6 +41,7 @@
       <div class="chips" id="type-chips"></div>
       <label class="check"><input type="checkbox" id="only-todo" checked> 未完了のみ</label>
       <label class="check"><input type="checkbox" id="only-faction" checked> この陣営で魂が出るものだけ</label>
+      <label class="check"><input type="checkbox" id="only-rift"> 亀裂限定のみ</label>
     </div>
     <p class="hint">集め終わったペットにチェックを入れてください。記録はこのブラウザにだけ保存されます。</p>
     <div class="pets" id="pets"></div>
@@ -48,6 +49,9 @@
 
   <!-- おすすめ狩場 -->
   <section id="tab-spots" class="tab" hidden>
+    <h2>亀裂で狙うべき場所</h2>
+    <p class="hint">自陣営では魂が出ず、<span id="rift-side"></span>の地域でしか取れない未収集ペット（亀裂限定）が集まっている場所です。</p>
+    <ol class="spots rift-spots" id="rift-spots"></ol>
     <h2>密集スポット</h2>
     <p class="hint">未完了ペットの魂を落とすモンスターが近くにまとまっている場所です。範囲内で狙えるペットの種類が多い順に並べています。</p>
     <div class="range">
@@ -67,6 +71,7 @@
       <select id="world"></select>
       <span id="map-filter"></span>
       <label class="check"><input type="checkbox" id="show-hot" checked> 密集スポットを表示</label>
+      <label class="check" id="rift-only-wrap" hidden><input type="checkbox" id="rift-only"> 亀裂限定のみ表示</label>
     </div>
     <div id="map"></div>
     <div class="legend" id="legend"></div>
