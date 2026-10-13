@@ -60,6 +60,13 @@ main { padding: 12px 16px 24px; max-width: 1200px; margin: 0 auto; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 2px 10px; cursor: pointer; font-size: .9em; }
 .chip[aria-pressed="true"] { border-color: currentColor; }
+.where-filter { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
+.where-label { color: var(--muted); font-size: .85em; padding: 0 6px; }
+.where-filter label { cursor: pointer; }
+.where-filter input { position: absolute; opacity: 0; pointer-events: none; }
+.where-filter label:has(input) { padding: 2px 10px; border-radius: 6px; font-size: .9em; color: var(--muted); }
+.where-filter label:has(input:checked) { background: var(--panel-2); color: var(--text); }
+.where-filter label:has(input:focus-visible) { outline: 2px solid var(--accent); }
 .check { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
 
 .dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; vertical-align: middle; }

@@ -221,12 +221,12 @@ function renderPets() {
   renderTypeChips();
   const q = $("#q").value.trim().toLowerCase();
   const onlyTodo = $("#only-todo").checked;
-  const onlyFaction = $("#only-faction").checked;
-  const onlyRift = $("#only-rift").checked;
+  const where = document.querySelector('input[name="where"]:checked').value;
   const list = DATA.pets.filter((p) => {
     if (onlyTodo && isDone(p)) return false;
     if (ui.typeFilter.size && !ui.typeFilter.has(p.type)) return false;
-    if (onlyRift ? !isRiftOnly(p) : onlyFaction && !petAvailable(p, state.faction)) return false;
+    if (where === "own" && !petAvailable(p, state.faction)) return false;
+    if (where === "rift" && !isRiftOnly(p)) return false;
     if (q) {
       const hay = [p.name, p.slug, ...p.drops.map((d) => DATA.monsters[d.monster].name)].join(" ").toLowerCase();
       if (!hay.includes(q)) return false;
@@ -592,9 +592,11 @@ function bind() {
   });
   $("#q").addEventListener("input", renderPets);
   $("#only-todo").addEventListener("change", renderPets);
-  $("#only-faction").addEventListener("change", renderPets);
-  $("#only-rift").addEventListener("change", renderPets);
-  $("#rift-only").addEventListener("change", drawPoints);
+  document.querySelectorAll('input[name="where"]').forEach((r) => r.addEventListener("change", renderPets));
+  $("#rift-only").addEventListener("change", () => {
+    ui.mapFocus = null; // 1 体だけの表示中は切り替えが効かないので解除する
+    drawPoints();
+  });
 
   $("#radius").addEventListener("input", renderSpots);
   $("#tab-spots").addEventListener("click", (e) => {
