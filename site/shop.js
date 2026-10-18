@@ -213,15 +213,27 @@ async function startShare() {
     setShopStatus("このブラウザは画面の撮影に対応していません。PC の Chrome / Edge で開くか、画像ファイルを読み込んでください。");
     return;
   }
+  setShopStatus("共有する画面を選んでください…");
   try {
-    shop.stream = await navigator.mediaDevices.getDisplayMedia({ video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: 5 }, audio: false });
-  } catch (_) {
-    setShopStatus("画面の選択がキャンセルされました。");
+    try {
+      shop.stream = await navigator.mediaDevices.getDisplayMedia({ video: { width: { ideal: 3840 }, height: { ideal: 2160 }, frameRate: 5 }, audio: false });
+    } catch (e) {
+      // 解像度の指定を受け付けないブラウザ向けに、指定なしでもう一度
+      if (e.name !== "TypeError" && e.name !== "OverconstrainedError") throw e;
+      shop.stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+    }
+    shop.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true });
+    shop.video.srcObject = shop.stream;
+    await shop.video.play();
+  } catch (e) {
+    stopShare();
+    setShopStatus(
+      e.name === "NotAllowedError"
+        ? "画面の共有が許可されませんでした。選択をキャンセルした場合はもう一度押してください。アプリ内のブラウザやプレビュー画面では使えないことがあるので、そのときは Chrome / Edge で直接開いてください。"
+        : `画面の共有を開始できませんでした（${e.name}: ${e.message}）。`
+    );
     return;
   }
-  shop.video = Object.assign(document.createElement("video"), { muted: true, playsInline: true });
-  shop.video.srcObject = shop.stream;
-  await shop.video.play();
   shop.stream.getVideoTracks()[0].addEventListener("ended", stopShare);
   updateShareButtons();
   setShopStatus("共有中です。ショップを開いた状態で「撮影して判定」を押してください。");

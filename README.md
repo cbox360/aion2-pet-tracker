@@ -47,12 +47,13 @@ python -m http.server 8000
 
 公開先: https://cbox360.github.io/aion2-pet-tracker/
 
-GitHub Pages は `gh-pages` ブランチ（`site/` の中身だけを切り出したもの）を配信している。`site/` を更新したら main にコミットしてから:
+GitHub Pages は `gh-pages` ブランチ（`site/` の中身だけを切り出したもの）を配信している。`site/` を更新したら:
 
 ```sh
-git subtree split --prefix site -b gh-pages
-git push origin main gh-pages
+sh scripts/deploy.sh "コミットメッセージ"
 ```
+
+CSS/JS の読み込みに付けた版番号（`?v=`）を更新してから公開する。GitHub Pages は各ファイルを 10 分キャッシュさせるので、版番号を変えないと更新直後に新旧のファイルが混ざって動かないことがある。
 
 ## データの出典とライセンス
 
