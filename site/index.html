@@ -6,7 +6,7 @@
 <title>AION2 ペット収集トラッカー</title>
 <meta name="description" content="AION2 のペット（魂）収集状況を記録し、未完了ペットの魂を落とすモンスターの湧き位置と効率のいい狩場を表示します。">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=202610190041">
+<link rel="stylesheet" href="style.css?v=202610190052">
 </head>
 <body>
 <header class="top">
@@ -90,6 +90,7 @@
       <button type="button" id="shop-capture" class="primary" hidden>撮影して判定</button>
       <button type="button" id="shop-stop" hidden>共有を停止</button>
       <label class="filebtn">画像ファイルを読み込む<input type="file" id="shop-file" accept="image/*"></label>
+      <button type="button" id="shop-save" hidden>撮影画像を保存</button>
     </div>
     <p class="hint">共有は停止するまで続くので、ショップが更新されたら「撮影して判定」を押すだけで判定し直せます。スクリーンショットを Ctrl+V で貼り付けても判定できます。</p>
     <p id="shop-status" class="msg" role="status"></p>
@@ -128,7 +129,7 @@
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="app.js?v=202610190041"></script>
-<script src="shop.js?v=202610190041"></script>
+<script src="app.js?v=202610190052"></script>
+<script src="shop.js?v=202610190052"></script>
 </body>
 </html>

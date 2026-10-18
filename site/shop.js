@@ -50,11 +50,39 @@ const SHOP_SLOTS = [
   [2088, 498, 149], [517, 911, 152], [844, 971, 146], [1698, 968, 146], [2025, 911, 149],
 ];
 const FEAT = 20;          // 照合する縮小画像の一辺
-const MIN_SCORE = 0.55;   // これ未満は判別できずとする
+const MIN_SCORE = 0.55;   // これ未満は「要確認」
+const MIN_GUESS = 0.40;   // これ未満は判別できずとする
+const SOLDOUT_ROWS = [0.5, 0.78]; // 「品切れ」の帯がかかる高さ（アイコンの縦位置の割合）
 const PORTRAIT_BG = "rgb(20,18,22)";
 
 let shopRefs = null;      // [{ pet, f: Float32Array }]
 const shop = { stream: null, video: null, canvas: null, results: [] };
+
+// 縮小画像の RGB 値（FEAT×FEAT×3）を、平均を引いて長さ 1 にした特徴量にする。
+// masked のときは「品切れ」の帯の行を除いて計算する（品切れ表示の枠でも照合できるように）
+function normalizeFeat(raw, masked) {
+  const f = Float32Array.from(raw);
+  const skip = (j) => masked && j >= Math.floor(FEAT * SOLDOUT_ROWS[0]) && j < Math.floor(FEAT * SOLDOUT_ROWS[1]);
+  const mean = [0, 0, 0];
+  let count = 0;
+  for (let j = 0; j < FEAT; j++) {
+    if (skip(j)) continue;
+    for (let i = 0; i < FEAT; i++) for (let c = 0; c < 3; c++) mean[c] += f[(j * FEAT + i) * 3 + c];
+    count += FEAT;
+  }
+  for (let c = 0; c < 3; c++) mean[c] /= count;
+  let norm = 0;
+  for (let j = 0; j < FEAT; j++)
+    for (let i = 0; i < FEAT; i++)
+      for (let c = 0; c < 3; c++) {
+        const k = (j * FEAT + i) * 3 + c;
+        f[k] = skip(j) ? 0 : f[k] - mean[c];
+        norm += f[k] * f[k];
+      }
+  norm = Math.sqrt(norm) || 1;
+  for (let k = 0; k < f.length; k++) f[k] /= norm;
+  return f;
+}
 
 function featureOf(src, sx, sy, sw, sh) {
   const c64 = featureOf.c64 ||= Object.assign(document.createElement("canvas"), { width: 64, height: 64 });
@@ -68,21 +96,9 @@ function featureOf(src, sx, sy, sw, sh) {
   xf.imageSmoothingQuality = "high";
   xf.drawImage(c64, 0, 0, FEAT, FEAT);
   const px = xf.getImageData(0, 0, FEAT, FEAT).data;
-  const n = FEAT * FEAT;
-  const f = new Float32Array(n * 3);
-  const mean = [0, 0, 0];
-  for (let i = 0; i < n; i++) for (let c = 0; c < 3; c++) mean[c] += px[i * 4 + c];
-  for (let c = 0; c < 3; c++) mean[c] /= n;
-  let norm = 0;
-  for (let i = 0; i < n; i++)
-    for (let c = 0; c < 3; c++) {
-      const v = px[i * 4 + c] - mean[c];
-      f[i * 3 + c] = v;
-      norm += v * v;
-    }
-  norm = Math.sqrt(norm) || 1;
-  for (let i = 0; i < f.length; i++) f[i] /= norm;
-  return f;
+  const raw = new Float32Array(FEAT * FEAT * 3);
+  for (let i = 0; i < FEAT * FEAT; i++) for (let c = 0; c < 3; c++) raw[i * 3 + c] = px[i * 4 + c];
+  return raw;
 }
 
 async function loadShopRefs() {
@@ -99,7 +115,8 @@ async function loadShopRefs() {
     // ショップの枠はポートレートの中央寄りを写すので、余白を変えて 3 通り用意する
     for (const m of [0, 0.08, 0.16]) {
       const s = img.width * m;
-      shopRefs.push({ pet: p, f: featureOf(img, s, s, img.width - 2 * s, img.height - 2 * s) });
+      const raw = featureOf(img, s, s, img.width - 2 * s, img.height - 2 * s);
+      shopRefs.push({ pet: p, f: normalizeFeat(raw, false), fm: normalizeFeat(raw, true) });
     }
   }
   return shopRefs;
@@ -126,12 +143,11 @@ function prepareWork(canvas) {
   shop.work = { scale, w, h, W, sat };
 }
 
-// 縮小画像上の正方形を FEAT×FEAT の平均色にして特徴量にする（画面外は背景色で埋める）
+// 縮小画像上の正方形を FEAT×FEAT の平均色にする（画面外は背景色で埋める）
 function featureFromWork(cx, cy, size) {
   const { scale, w, h, W, sat } = shop.work;
   const x0 = (cx - size / 2) * scale, y0 = (cy - size / 2) * scale, cell = (size * scale) / FEAT;
-  const n = FEAT * FEAT, f = new Float32Array(n * 3), bg = [20, 18, 22];
-  const mean = [0, 0, 0];
+  const f = new Float32Array(FEAT * FEAT * 3), bg = [20, 18, 22];
   for (let j = 0; j < FEAT; j++)
     for (let i = 0; i < FEAT; i++) {
       let ax = Math.floor(x0 + i * cell), bx = Math.max(ax + 1, Math.floor(x0 + (i + 1) * cell));
@@ -143,43 +159,52 @@ function featureFromWork(cx, cy, size) {
           ? (sat[ch][by * W + bx] - sat[ch][ay * W + bx] - sat[ch][by * W + ax] + sat[ch][ay * W + ax]) / area
           : bg[ch];
         f[(j * FEAT + i) * 3 + ch] = v;
-        mean[ch] += v;
       }
     }
-  for (let ch = 0; ch < 3; ch++) mean[ch] /= n;
-  let norm = 0;
-  for (let i = 0; i < f.length; i++) { f[i] -= mean[i % 3]; norm += f[i] * f[i]; }
-  norm = Math.sqrt(norm) || 1;
-  for (let i = 0; i < f.length; i++) f[i] /= norm;
   return f;
 }
 
-function rankCrop(x, y, size) {
-  const q = featureFromWork(x, y, size);
+function rankCrop(x, y, size, withMask) {
+  const raw = featureFromWork(x, y, size);
+  const q = normalizeFeat(raw, false), qm = withMask ? normalizeFeat(raw, true) : null;
   const best = new Map();
   for (const r of shopRefs) {
-    let s = 0;
-    const f = r.f;
-    for (let i = 0; i < f.length; i++) s += f[i] * q[i];
+    let s = 0, sm = 0;
+    const f = r.f, fm = r.fm;
+    if (withMask) {
+      for (let i = 0; i < f.length; i++) { s += f[i] * q[i]; sm += fm[i] * qm[i]; }
+      s = Math.max(s, sm);
+    } else {
+      for (let i = 0; i < f.length; i++) s += f[i] * q[i];
+    }
     if (!(best.get(r.pet) >= s)) best.set(r.pet, s);
   }
   return [...best.entries()].map(([pet, score]) => ({ pet, score })).sort((a, b) => b.score - a.score);
 }
 
 // 予想位置のまわりを粗く、次に細かく探して一番よく一致する位置で判別する
+// 一致度が低いときだけ、「品切れ」の帯を除いた照合でも探し直す（常に使うと位置ずれ先で別のペットに偶然一致しやすい）
+const RETRY_MASKED_BELOW = 0.6;
+
 function recognizeAt(cx, cy, size) {
-  let best = null;
-  const tryAt = (x, y, s) => {
-    const r = rankCrop(x, y, s);
-    if (!best || r[0].score > best.ranked[0].score) best = { x, y, size: s, ranked: r };
+  const search = (withMask) => {
+    let best = null;
+    const tryAt = (x, y, s) => {
+      const r = rankCrop(x, y, s, withMask);
+      if (!best || r[0].score > best.ranked[0].score) best = { x, y, size: s, ranked: r };
+    };
+    for (const ds of [0.9, 1, 1.1])
+      for (let i = -2; i <= 2; i++)
+        for (let j = -2; j <= 2; j++) tryAt(cx + i * 0.1 * size, cy + j * 0.1 * size, size * ds);
+    const b = { ...best };
+    for (let i = -1; i <= 1; i++)
+      for (let j = -1; j <= 1; j++) if (i || j) tryAt(b.x + i * 0.04 * b.size, b.y + j * 0.04 * b.size, b.size);
+    return best;
   };
-  for (const ds of [0.9, 1, 1.1])
-    for (let i = -2; i <= 2; i++)
-      for (let j = -2; j <= 2; j++) tryAt(cx + i * 0.1 * size, cy + j * 0.1 * size, size * ds);
-  const b = { ...best };
-  for (let i = -1; i <= 1; i++)
-    for (let j = -1; j <= 1; j++) if (i || j) tryAt(b.x + i * 0.04 * b.size, b.y + j * 0.04 * b.size, b.size);
-  return best;
+  const plain = search(false);
+  if (plain.ranked[0].score >= RETRY_MASKED_BELOW) return plain;
+  const masked = search(true);
+  return masked.ranked[0].score > plain.ranked[0].score ? masked : plain;
 }
 
 async function recognizeShop() {
@@ -291,8 +316,8 @@ const CLASS_COLOR = { none: "#ff6b6b", boss: "#ffb84d", rift: "#ffffff", hunt: "
 function resultInfo(r) {
   const top = r.ranked[0];
   if (r.chosen) return { pet: r.chosen, cls: shopClass(r.chosen) };
-  if (top.score < MIN_SCORE) return { pet: null, cls: { key: "unknown" } };
-  return { pet: top.pet, cls: shopClass(top.pet) };
+  if (top.score < MIN_GUESS) return { pet: null, cls: { key: "unknown" } };
+  return { pet: top.pet, cls: shopClass(top.pet), low: top.score < MIN_SCORE };
 }
 
 function drawShopPreview() {
@@ -335,13 +360,14 @@ function bossNote(cls) {
 
 function renderShopResults() {
   drawShopPreview();
+  $("#shop-save").hidden = !shop.canvas;
   const items = shop.results.map((r, i) => ({ r, i, ...resultInfo(r) }));
   const buys = items.filter((x) => SHOP_CLASS[x.cls.key]?.buy).sort((a, b) => SHOP_CLASS[a.cls.key].order - SHOP_CLASS[b.cls.key].order);
   setShopStatus(shop.results.length ? `${shop.results.length}枠を判別しました。` : "");
   $("#shop-summary").innerHTML = !shop.results.length ? "" : buys.length
-    ? `<strong>買うべきペット ${buys.length}件</strong>` + buys.map((x) => `<div class="buy-line" style="--c:${CLASS_COLOR[x.cls.key]}">#${x.i + 1} ${esc(x.pet.name)} <span class="cls">${SHOP_CLASS[x.cls.key].label}</span></div>`).join("")
+    ? `<strong>買うべきペット ${buys.length}件</strong>` + buys.map((x) => `<div class="buy-line" style="--c:${CLASS_COLOR[x.cls.key]}">#${x.i + 1} ${esc(x.pet.name)} <span class="cls">${SHOP_CLASS[x.cls.key].label}</span>${x.low ? ' <span class="low">要確認</span>' : ""}</div>`).join("")
     : "<strong>買うべきペットはありません</strong>";
-  $("#shop-results").innerHTML = items.map(({ r, i, pet, cls }) => {
+  $("#shop-results").innerHTML = items.map(({ r, i, pet, cls, low }) => {
     const opts = r.ranked.slice(0, 6).map((c) =>
       `<option value="${esc(c.pet.slug)}" ${pet === c.pet ? "selected" : ""}>${esc(c.pet.name)}（${Math.round(c.score * 100)}）</option>`).join("");
     const label = cls.key === "unknown" ? "判別できず" : SHOP_CLASS[cls.key].label;
@@ -350,7 +376,7 @@ function renderShopResults() {
       <img class="crop" src="${cropThumb(r)}" alt="">
       ${pet ? `<img class="ref" src="portraits/${esc(pet.slug)}.webp" alt="">` : '<span class="ref"></span>'}
       <div class="body">
-        <div><strong>${pet ? esc(pet.name) : "？"}</strong> <span class="cls">${label}</span></div>
+        <div><strong>${pet ? esc(pet.name) : "？"}</strong> <span class="cls">${label}</span>${low ? ' <span class="low" title="一致度が低いので、ショップの表示と見比べてください">要確認</span>' : ""}</div>
         ${pet ? bossNote(cls) : ""}
         <div class="row">
           <select data-shop-pick="${i}" aria-label="候補">${cls.key === "unknown" ? '<option value="">候補を選ぶ</option>' : ""}${opts}</select>
@@ -374,6 +400,13 @@ function bindShop() {
   $("#shop-capture").addEventListener("click", captureFrame);
   $("#shop-stop").addEventListener("click", stopShare);
   $("#shop-file").addEventListener("change", (e) => loadShopFile(e.target.files[0]));
+  $("#shop-save").addEventListener("click", () => {
+    shop.canvas?.toBlob((blob) => {
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `aion2-shop-${Date.now()}.png` });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }, "image/png");
+  });
   document.addEventListener("paste", (e) => {
     if (ui.tab !== "shop") return;
     const item = [...(e.clipboardData?.items || [])].find((x) => x.type.startsWith("image/"));
