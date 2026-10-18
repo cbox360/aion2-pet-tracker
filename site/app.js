@@ -322,11 +322,30 @@ function levelRange(mons) {
   return lo === hi ? `Lv.${lo}` : `Lv.${lo}〜${hi}`;
 }
 
-function petTags(pets) {
-  return [...pets]
-    .sort((a, b) => a.name.localeCompare(b.name, "ja"))
-    .map((p) => `<span class="tag"><span class="dot bg-${p.type}"></span> ${esc(p.name)}</span>`)
+// 狩るモンスターの一覧。rows: [{ m, n: 湧き数, pets: [未収集ペット] }]
+// モンスター名を押すと、その地図でそのモンスターの湧き点だけを表示する
+function monsterList(rows, world) {
+  const items = rows
+    .sort((a, b) => b.pets.length - a.pets.length || b.n - a.n || (a.m.level ?? 0) - (b.m.level ?? 0))
+    .map(({ m, n, pets }) => `<li>
+      <button type="button" class="linkbtn mon-name" data-goto="${esc(m.slug)}|${world}">${esc(m.name)}</button>
+      <span class="mon-meta">Lv.${m.level ?? "?"}${m.rank && m.rank !== "ノーマル" ? ` ${esc(m.rank)}` : ""} ・ ${n}か所</span>
+      <span class="mon-pets">${pets.map((p) => `<span class="tag"><span class="dot bg-${p.type}"></span> ${esc(p.name)}</span>`).join("")}</span>
+    </li>`)
     .join("");
+  return `<ul class="mon-list">${items}</ul>`;
+}
+
+// 密集スポット内の点をモンスターごとにまとめる
+function spotMonsters(s) {
+  const by = new Map();
+  for (const q of s.ns) {
+    const e = by.get(q.m) || { m: q.m, n: 0, pets: new Set() };
+    e.n++;
+    q.pets.forEach((x) => e.pets.add(x.pet));
+    by.set(q.m, e);
+  }
+  return [...by.values()].map((e) => ({ ...e, pets: [...e.pets] }));
 }
 
 function renderSpots() {
@@ -335,10 +354,10 @@ function renderSpots() {
   const spotItems = (spots, kind) => spots.map((s, i) => `<li>
         <div class="spot-title">
           <strong>${esc(mainZone(s.mons, s.world) || "不明なゾーン")}</strong>
-          <span class="spot-meta">${esc(worldName[s.world] || s.world)} ・ ペット${s.pets.size}種 ・ 湧き${s.ns.length}か所 ・ ${levelRange(s.mons)}</span>
-          <button type="button" class="linkbtn" data-map-spot="${kind}:${i}">マップで見る</button>
+          <span class="spot-meta">${esc(worldName[s.world] || s.world)} ・ ペット${s.pets.size}種 ・ モンスター${s.mons.size}種 ・ 湧き${s.ns.length}か所 ・ ${levelRange(s.mons)}</span>
+          <button type="button" class="linkbtn" data-map-spot="${kind}:${i}">スポットをマップで見る</button>
         </div>
-        <div class="tags">${petTags(s.pets)}</div>
+        ${monsterList(spotMonsters(s), s.world)}
       </li>`).join("");
   const spots = computeHotspots(radius);
   const riftSpots = computeHotspots(radius, 6, targetPoints("rift"));
@@ -358,15 +377,16 @@ function renderSpots() {
     if (!pets.length) continue;
     for (const z of m.zones) {
       if (!z.world || !inFaction(z.world, state.faction)) continue;
-      const e = (zones[z.zone] ||= { name: z.name, map: z.map, pets: new Set(), mons: new Set(), spawns: 0 });
+      const e = (zones[z.zone] ||= { name: z.name, map: z.map, world: z.world, pets: new Set(), mons: new Set(), rows: [], spawns: 0 });
       pets.forEach((p) => e.pets.add(p));
       e.mons.add(m);
+      e.rows.push({ m, n: z.spawns || 0, pets });
       e.spawns += z.spawns || 0;
     }
   }
   const rows = Object.values(zones).sort((a, b) => b.pets.size - a.pets.size || b.spawns - a.spawns);
-  $("#zones").innerHTML = `<thead><tr><th>ゾーン</th><th>地図</th><th>ペット</th><th>湧き数</th><th>レベル</th><th>狙えるペット</th></tr></thead><tbody>` +
-    rows.map((z) => `<tr><td>${esc(z.name)}</td><td>${esc(z.map)}</td><td class="n">${z.pets.size}</td><td class="n">${z.spawns}</td><td class="n">${levelRange(z.mons)}</td><td><div class="tags">${petTags(z.pets)}</div></td></tr>`).join("") +
+  $("#zones").innerHTML = `<thead><tr><th>ゾーン</th><th>地図</th><th>ペット</th><th>湧き数</th><th>レベル</th><th>狙うモンスター</th></tr></thead><tbody>` +
+    rows.map((z) => `<tr><td>${esc(z.name)}</td><td>${esc(z.map)}</td><td class="n">${z.pets.size}</td><td class="n">${z.spawns}</td><td class="n">${levelRange(z.mons)}</td><td>${monsterList(z.rows, z.world)}</td></tr>`).join("") +
     "</tbody>";
 }
 
@@ -455,7 +475,7 @@ function drawPoints() {
     const hot = computeHotspots(+$("#radius").value, 12, riftMode ? targetPoints("rift") : targetPoints("own"));
     for (const s of hot.filter((s) => s.world === ui.world)) {
       L.circle(toLatLng(s.x, s.y), { radius: s.r * 256, color: riftMode ? "#ffffff" : "#d9b45a", weight: 2, fill: true, fillOpacity: 0.06, dashArray: "6 4" })
-        .bindPopup(`<strong>${esc(mainZone(s.mons, s.world))}</strong>${riftMode ? " <span class=\"badge-rift\">亀裂限定</span>" : ""}<br>ペット${s.pets.size}種 ・ 湧き${s.ns.length}か所<div class="tags">${petTags(s.pets)}</div>`)
+        .bindPopup(`<strong>${esc(mainZone(s.mons, s.world))}</strong>${riftMode ? " <span class=\"badge-rift\">亀裂限定</span>" : ""}<br><span class="muted">ペット${s.pets.size}種 ・ 湧き${s.ns.length}か所</span>${monsterList(spotMonsters(s), s.world)}`)
         .addTo(hotLayer);
     }
   }
@@ -638,6 +658,11 @@ function bind() {
   $("#tab-spots").addEventListener("click", (e) => {
     const b = e.target.closest("[data-map-spot]");
     if (b) focusSpot(b.dataset.mapSpot);
+    const g = e.target.closest("[data-goto]");
+    if (g) {
+      const [slug, world] = g.dataset.goto.split("|");
+      focusMonster(slug, world);
+    }
   });
 
   $("#world").addEventListener("change", (e) => {
