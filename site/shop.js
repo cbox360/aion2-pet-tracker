@@ -55,6 +55,11 @@ const MIN_GUESS = 0.40;   // これ未満は判別できずとする
 const SOLDOUT_ROWS = [0.5, 0.78]; // 「品切れ」の帯がかかる高さ（アイコンの縦位置の割合）
 const PORTRAIT_BG = "rgb(20,18,22)";
 
+// 商品名の先頭「ペット：」の見本（枠の一辺を 100px にそろえたときの 58x11 の濃淡）。
+// 「特殊」タブにはペット以外（神石・外形など）も並ぶので、これが見つからない枠は除く
+const PET_TITLE = { w: 58, h: 11, data: [3,3,3,5,0,0,0,5,2,20,145,187,115,8,3,4,3,3,3,3,3,5,5,3,3,3,3,3,3,3,3,3,6,0,52,206,165,20,0,4,3,3,3,4,3,3,3,3,3,3,2,7,86,84,6,2,3,3,3,3,4,0,25,92,41,0,1,112,136,29,170,62,0,6,4,4,5,4,2,0,0,3,3,3,4,5,3,3,4,3,6,0,45,201,161,16,2,5,4,3,3,3,3,3,3,3,3,6,0,76,207,207,74,0,5,3,3,5,0,29,169,210,190,73,0,108,146,51,174,59,0,6,3,0,0,1,6,45,39,1,4,4,0,0,3,4,4,3,6,0,45,201,159,5,0,3,6,5,3,4,4,4,4,4,3,6,1,55,190,189,52,1,5,4,6,1,17,156,208,179,199,197,69,7,127,169,95,5,4,3,3,38,86,7,42,201,143,1,1,38,152,96,4,3,4,4,6,0,47,196,184,96,31,6,0,0,6,4,4,4,4,4,4,4,4,0,34,34,0,4,4,4,3,4,134,214,157,30,99,207,193,66,0,2,0,3,5,4,5,149,220,59,11,170,197,45,0,78,214,155,3,4,4,4,6,0,48,192,198,210,198,146,91,30,0,2,4,4,4,4,4,4,4,5,0,0,5,4,4,5,0,113,208,186,39,0,1,114,209,192,65,0,7,4,4,7,0,79,209,143,0,109,216,85,0,127,217,78,0,6,4,4,6,0,47,197,177,140,181,215,214,181,131,25,0,5,4,4,4,4,4,4,8,8,4,4,4,6,127,199,201,80,0,7,3,5,131,210,188,53,0,7,4,4,2,15,182,186,19,27,63,11,29,186,187,31,0,6,4,4,6,0,46,201,159,6,28,86,152,212,181,22,1,6,4,4,4,4,4,5,0,0,5,4,4,7,127,213,127,0,6,4,6,2,13,150,208,182,43,0,5,4,3,3,50,30,7,1,0,0,121,216,113,1,6,4,4,4,6,0,46,201,161,17,0,0,8,68,75,0,5,4,4,4,4,4,5,0,34,34,0,5,5,8,5,103,26,1,5,4,4,6,0,28,173,207,174,39,2,5,4,4,0,0,5,3,0,89,207,175,20,2,6,5,4,5,7,0,46,201,160,15,3,9,3,0,0,5,4,5,5,4,4,6,1,53,189,188,50,1,7,9,3,0,3,5,4,4,4,4,6,0,50,186,212,138,3,4,5,4,7,5,0,15,111,203,192,58,0,5,4,4,4,4,7,0,46,202,161,15,2,6,6,7,7,4,4,4,5,5,5,8,0,78,209,208,75,0,9,9,6,6,6,5,5,5,5,5,5,7,0,85,180,40,1,6,5,5,4,9,75,161,206,188,66,0,6,4,5,5,5,5,8,0,53,207,165,21,1,6,5,5,5,5,5,5,5,5,5,5,3,9,89,87,8,4,9,10] };
+const PET_TITLE_MIN = 0.55; // ペット 0.77〜0.99、ペット以外 0.24〜0.34（2026-10 の画面で確認）
+
 let shopRefs = null;      // [{ pet, f: Float32Array }]
 const shop = { stream: null, video: null, canvas: null, results: [] };
 
@@ -207,6 +212,48 @@ function recognizeAt(cx, cy, size) {
   return masked.ranked[0].score > plain.ranked[0].score ? masked : plain;
 }
 
+// 枠の上の商品名欄で「ペット：」を探し、一番よく一致したときの正規化相互相関を返す
+function petTitleScore(cx, cy, size) {
+  const k = 100 / size;
+  const sx = cx - 0.95 * size, sy = cy - 0.95 * size, sw = 1.25 * size, sh = 0.45 * size;
+  const w = Math.round(sw * k), h = Math.round(sh * k);
+  const c = (petTitleScore.c ||= document.createElement("canvas"));
+  c.width = w;
+  c.height = h;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.imageSmoothingQuality = "high";
+  x.fillStyle = "#000";
+  x.fillRect(0, 0, w, h);
+  x.drawImage(shop.canvas, sx, sy, sw, sh, 0, 0, w, h);
+  const px = x.getImageData(0, 0, w, h).data;
+  const g = new Float32Array(w * h);
+  for (let i = 0; i < g.length; i++) g[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+  const T = (petTitleScore.T ||= (() => {
+    const d = PET_TITLE.data, n = d.length;
+    const m = d.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(d.reduce((a, b) => a + (b - m) ** 2, 0) / n) || 1;
+    return Float32Array.from(d, (v) => (v - m) / sd);
+  })());
+  const tw = PET_TITLE.w, th = PET_TITLE.h, n = tw * th;
+  let best = -1;
+  for (let yy = 0; yy + th <= h; yy++)
+    for (let xx = 0; xx + tw <= w; xx++) {
+      let sum = 0, sum2 = 0, dot = 0;
+      for (let j = 0; j < th; j++)
+        for (let i = 0; i < tw; i++) {
+          const v = g[(yy + j) * w + xx + i];
+          sum += v;
+          sum2 += v * v;
+          dot += v * T[j * tw + i];
+        }
+      const sd = Math.sqrt(Math.max(0, sum2 / n - (sum / n) ** 2));
+      if (sd < 1) continue;
+      const score = dot / n / sd; // T は平均 0 なので、窓の平均を引く必要はない
+      if (score > best) best = score;
+    }
+  return best;
+}
+
 async function recognizeShop() {
   const canvas = shop.canvas;
   if (!canvas) return;
@@ -218,7 +265,11 @@ async function recognizeShop() {
   shop.results = [];
   for (const [x, y, s] of SHOP_SLOTS) {
     await new Promise((r) => setTimeout(r)); // 画面を固めない
-    shop.results.push(recognizeAt(ox + x * k, y * k, s * k));
+    const cx = ox + x * k, cy = y * k, size = s * k;
+    const title = petTitleScore(cx, cy, size);
+    shop.results.push(title < PET_TITLE_MIN
+      ? { x: cx, y: cy, size, ranked: [], notPet: true, title }
+      : { ...recognizeAt(cx, cy, size), title });
   }
   renderShopResults();
 }
@@ -311,9 +362,10 @@ function updateShareButtons() {
   $("#shop-stop").hidden = !on;
 }
 
-const CLASS_COLOR = { none: "#ff6b6b", boss: "#ffb84d", rift: "#ffffff", hunt: "#7d8796", done: "#4fbf7f", unknown: "#7d8796" };
+const CLASS_COLOR = { none: "#ff6b6b", boss: "#ffb84d", rift: "#ffffff", hunt: "#7d8796", done: "#4fbf7f", unknown: "#7d8796", notpet: "#4a4f5a" };
 
 function resultInfo(r) {
+  if (r.notPet) return { pet: null, cls: { key: "notpet" } };
   const top = r.ranked[0];
   if (r.chosen) return { pet: r.chosen, cls: shopClass(r.chosen) };
   if (top.score < MIN_GUESS) return { pet: null, cls: { key: "unknown" } };
@@ -335,7 +387,9 @@ function drawShopPreview() {
     const s = r.size * scale, x = r.x * scale - s / 2, y = r.y * scale - s / 2;
     ctx.lineWidth = SHOP_CLASS[cls.key]?.buy ? 4 : 2;
     ctx.strokeStyle = CLASS_COLOR[cls.key];
+    ctx.setLineDash(cls.key === "notpet" ? [6, 4] : []);
     ctx.strokeRect(x, y, s, s);
+    ctx.setLineDash([]);
     ctx.fillStyle = "rgba(0,0,0,.7)";
     ctx.fillRect(x, y, 22, 20);
     ctx.fillStyle = CLASS_COLOR[cls.key];
@@ -361,9 +415,13 @@ function bossNote(cls) {
 function renderShopResults() {
   drawShopPreview();
   $("#shop-save").hidden = !shop.canvas;
-  const items = shop.results.map((r, i) => ({ r, i, ...resultInfo(r) }));
+  const all = shop.results.map((r, i) => ({ r, i, ...resultInfo(r) }));
+  const items = all.filter((x) => x.cls.key !== "notpet");
+  const skipped = all.length - items.length;
   const buys = items.filter((x) => SHOP_CLASS[x.cls.key]?.buy).sort((a, b) => SHOP_CLASS[a.cls.key].order - SHOP_CLASS[b.cls.key].order);
-  setShopStatus(shop.results.length ? `${shop.results.length}枠を判別しました。` : "");
+  setShopStatus(shop.results.length
+    ? `${shop.results.length}枠を判別しました。${skipped ? `ペット以外の商品 ${skipped}枠は除外しています（画像では点線の枠）。ペットなのに除外されたときは、画像でそのアイコンをクリックしてください。` : ""}`
+    : "");
   $("#shop-summary").innerHTML = !shop.results.length ? "" : buys.length
     ? `<strong>買うべきペット ${buys.length}件</strong>` + buys.map((x) => `<div class="buy-line" style="--c:${CLASS_COLOR[x.cls.key]}">#${x.i + 1} ${esc(x.pet.name)} <span class="cls">${SHOP_CLASS[x.cls.key].label}</span>${x.low ? ' <span class="low">要確認</span>' : ""}</div>`).join("")
     : "<strong>買うべきペットはありません</strong>";
