@@ -140,6 +140,7 @@ function showTab(tab) {
   if (tab === "pets") renderPets();
   if (tab === "spots") renderSpots();
   if (tab === "map") renderMap();
+  if (tab === "shop") renderShop();
   if (tab === "data") $("#backup").value = "";
 }
 
@@ -694,6 +695,7 @@ fetch("data/pets.json")
     DATA = prepare(data);
     $("#built").textContent = ` データ更新日: ${data.builtAt}`;
     bind();
+    bindShop();
     renderAll();
   })
   .catch((e) => {
