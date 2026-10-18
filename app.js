@@ -425,7 +425,7 @@ function drawPoints() {
   hotLayer.clearLayers();
   const focus = ui.mapFocus;
   $("#map-filter").innerHTML = focus
-    ? `${esc(DATA.monsters[focus].name)} のみ表示 <button type="button" class="linkbtn" id="clear-focus">解除</button>`
+    ? `${esc(DATA.monsters[focus].name)} のみ表示（この地図 ${DATA.monsters[focus].spawnMaps.filter((s) => s.world === ui.world).reduce((n, s) => n + s.points.length, 0)}か所） <button type="button" class="linkbtn" id="clear-focus">解除</button>`
     : "";
   const riftMode = isRiftWorld(ui.world);
   const riftOnlyView = riftMode && $("#rift-only").checked;
@@ -471,18 +471,54 @@ function monsterPopup(m) {
     .join("");
   const zones = m.zones.filter((z) => z.world === ui.world).map((z) => esc(z.name)).join("、");
   return `<strong><a href="${METABOT}/monsters/${esc(m.slug)}" target="_blank" rel="noopener">${esc(m.name)}</a></strong> Lv.${m.level ?? "?"}
-    <div class="muted">${zones}</div>${pets}`;
+    <div class="muted">${zones}</div>${pets}${monsterLocations(m)}`;
 }
 
-function focusMonster(slug) {
+// モンスターが湧くすべての地図とゾーン。行ける地図はクリックでその地図に移動して、そのモンスターだけを表示する
+function monsterLocations(m) {
+  const byWorld = new Map();
+  for (const s of m.spawnMaps) {
+    const e = byWorld.get(s.world) || { points: 0, zones: [] };
+    e.points += s.points.length;
+    byWorld.set(s.world, e);
+  }
+  for (const z of m.zones) {
+    if (!z.world) continue;
+    const e = byWorld.get(z.world) || { points: 0, zones: [] };
+    e.zones.push(z);
+    byWorld.set(z.world, e);
+  }
+  if (!byWorld.size) return '<div class="locs muted">フィールドでの湧きはありません（ダンジョン等）</div>';
+  const reachable = new Set(availableWorlds());
+  // ゾーン表の湧き数を優先し、ゾーン表にない地図は図上の点の数で数える
+  const countOf = (e) => (e.zones.length ? e.zones.reduce((n, z) => n + (z.spawns || 0), 0) : e.points);
+  const total = [...byWorld.values()].reduce((n, e) => n + countOf(e), 0);
+  const rows = [...byWorld.entries()]
+    .sort(([a], [b]) => (a === ui.world ? -1 : b === ui.world ? 1 : (WORLDS[a]?.order ?? 99) - (WORLDS[b]?.order ?? 99)))
+    .map(([w, e]) => {
+      const tag = isRiftWorld(w) ? "亀裂" : WORLDS[w]?.unreleased ? "未開放の可能性" : "";
+      const zones = e.zones.sort((a, b) => b.spawns - a.spawns).map((z) => `${esc(z.name)} ${z.spawns}`).join("、");
+      const action = w === ui.world && ui.mapFocus === m.slug
+        ? '<span class="muted">表示中</span>'
+        : reachable.has(w) && e.points
+          ? `<button type="button" class="linkbtn" data-goto="${esc(m.slug)}|${w}">${w === ui.world ? "この地図で全部表示" : "表示"}</button>`
+          : '<span class="muted">設定で非表示</span>';
+      return `<li><strong>${esc(worldName[w] || w)}</strong> ${countOf(e)}か所${tag ? ` <span class="tag">${tag}</span>` : ""} ${action}
+        ${zones ? `<div class="muted">${zones}</div>` : ""}</li>`;
+    })
+    .join("");
+  return `<div class="locs"><div class="locs-title">湧き場所（全${total}か所）</div><ul>${rows}</ul></div>`;
+}
+
+function focusMonster(slug, world) {
   const m = DATA.monsters[slug];
-  const world = (m.spawnMaps.find((s) => inFaction(s.world, state.faction) && s.points.length) ||
+  world ||= (m.spawnMaps.find((s) => inFaction(s.world, state.faction) && s.points.length) ||
     m.spawnMaps.find((s) => isRiftWorld(s.world) && s.points.length))?.world;
   if (!world) return;
+  map?.closePopup();
   ui.mapFocus = slug;
   ui.world = world;
   showTab("map");
-  setWorld(world, false);
   const pts = m.spawnMaps.filter((s) => s.world === world).flatMap((s) => s.points);
   map.fitBounds(L.latLngBounds(pts.map(([x, y]) => toLatLng(x, y))).pad(0.5), { maxZoom: 4 });
 }
@@ -610,6 +646,12 @@ function bind() {
     drawPoints();
   });
   $("#show-hot").addEventListener("change", drawPoints);
+  $("#map").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-goto]");
+    if (!b) return;
+    const [slug, world] = b.dataset.goto.split("|");
+    focusMonster(slug, world);
+  }, true); // Leaflet はポップアップ内のクリックの伝播を止めるのでキャプチャで受ける
   $("#map-filter").addEventListener("click", (e) => {
     if (e.target.id === "clear-focus") { ui.mapFocus = null; drawPoints(); }
   });

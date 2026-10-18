@@ -125,6 +125,11 @@ table.zones { width: 100%; border-collapse: collapse; font-size: .92em; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel); color: var(--text); }
 .leaflet-popup-content { margin: 10px 12px; font-size: 13px; line-height: 1.5; }
 .leaflet-popup-content .muted { color: var(--muted); }
+.locs { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--line); }
+.locs-title { font-weight: 600; margin-bottom: 2px; }
+.locs ul { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow-y: auto; }
+.locs li { padding: 3px 0; }
+.locs li + li { border-top: 1px dashed var(--line); }
 
 /* data */
 textarea { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
