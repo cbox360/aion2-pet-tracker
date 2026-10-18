@@ -26,11 +26,14 @@ cache/           取得済み HTML・元画像（公開しない）
 python scripts/build_data.py --refresh   # 全ページを取り直す（1.2 秒間隔、20 分ほど）
 python scripts/build_tiles.py world_l_a world_d_a abyss_reshanta_a            # interactive-map の地図から
 python scripts/build_tiles.py --metabot world_l_b world_d_b abyss_reshanta_c abyss_reshanta_d  # MetaBot の全体図から
+python scripts/build_portraits.py   # ショップ確認タブの照合用ポートレート（site/portraits）
 ```
 
 新しいワールドに湧き点が出たら `site/app.js` の `WORLDS` / `WORLD_PX` に追加する。
 
-`build_tiles.py` は Pillow が必要（`pip install pillow`）。
+`build_tiles.py` / `build_portraits.py` は Pillow が必要（`pip install pillow`）。
+
+ショップ確認タブは、ショップ画面の枠位置を 2539x1417 の画面を基準に `site/shop.js` の `SHOP_SLOTS` で持っている。ゲーム側でレイアウトが変わったら更新する。
 
 ## ローカルで確認
 

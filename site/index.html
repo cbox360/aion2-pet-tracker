@@ -29,6 +29,7 @@
   <button type="button" role="tab" data-tab="pets">図鑑</button>
   <button type="button" role="tab" data-tab="spots">おすすめ狩場</button>
   <button type="button" role="tab" data-tab="map">マップ</button>
+  <button type="button" role="tab" data-tab="shop">ショップ確認</button>
   <button type="button" role="tab" data-tab="data">データ管理</button>
 </nav>
 
@@ -81,6 +82,30 @@
     <div class="legend" id="legend"></div>
   </section>
 
+  <!-- ショップ確認 -->
+  <section id="tab-shop" class="tab" hidden>
+    <p class="hint">ゲーム内のペットショップを開いた状態で撮影すると、並んでいるペットを判別して買うべきものを表示します。画像はこのブラウザの中だけで処理され、どこにも送信されません。</p>
+    <div class="buttons">
+      <button type="button" id="shop-share" class="primary">ゲーム画面を選んで撮影</button>
+      <button type="button" id="shop-capture" class="primary" hidden>撮影して判定</button>
+      <button type="button" id="shop-stop" hidden>共有を停止</button>
+      <label class="filebtn">画像ファイルを読み込む<input type="file" id="shop-file" accept="image/*"></label>
+    </div>
+    <p class="hint">共有は停止するまで続くので、ショップが更新されたら「撮影して判定」を押すだけで判定し直せます。スクリーンショットを Ctrl+V で貼り付けても判定できます。</p>
+    <p id="shop-status" class="msg" role="status"></p>
+    <div class="shop-summary" id="shop-summary"></div>
+    <div class="shop-legend">
+      <span style="--c:#ff6b6b">① フィールドで出ない</span>
+      <span style="--c:#ffb84d">② フィールドボス（亀裂側を含む）</span>
+      <span style="--c:#ffffff">③ 亀裂限定</span>
+      <span style="--c:#7d8796">狩りで取れる・判別できず</span>
+      <span style="--c:#4fbf7f">収集済み</span>
+    </div>
+    <ol class="shop-results" id="shop-results"></ol>
+    <div class="shop-preview-wrap"><canvas id="shop-preview" hidden></canvas></div>
+    <p class="hint">判別できなかったペットは、上の画像でそのアイコンをクリックすると追加で判別します。間違っているときは候補から選び直してください。</p>
+  </section>
+
   <!-- データ管理 -->
   <section id="tab-data" class="tab" hidden>
     <h2>バックアップ</h2>
@@ -97,11 +122,13 @@
 
 <footer class="credits">
   <p>ペット・モンスター・湧き位置データ: <a href="https://metabot.gg/en/aion-2">MetaBot.GG</a>（AION 2 グローバル版クライアントのデータ）。各ペット・モンスターの元ページへのリンクも掲載しています。</p>
+  <p>ペットのポートレート: <a href="https://metabot.gg/en/aion-2/mounts">MetaBot.GG</a>。</p>
   <p>地図画像: <a href="https://github.com/aion2-interactive-map/aion2-interactive-map">aion2-interactive-map</a>（CC BY-NC 4.0。ベルテロン・アルトガルド・エレシュランタ下層）、<a href="https://metabot.gg/en/aion-2/map">MetaBot.GG</a>（エルテネン・モルヘイム・エレシュランタ中層/表層）。</p>
   <p>AION 2 は NCSOFT の商標です。本サイトは非公式のファンサイトで、NCSOFT・MetaBot.GG とは関係ありません。<span id="built"></span></p>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="app.js"></script>
+<script src="shop.js"></script>
 </body>
 </html>

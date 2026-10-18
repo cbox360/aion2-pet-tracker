@@ -140,6 +140,26 @@ table.zones { width: 100%; border-collapse: collapse; font-size: .92em; }
 .locs li { padding: 3px 0; }
 .locs li + li { border-top: 1px dashed var(--line); }
 
+/* shop */
+.buttons .primary { border-color: var(--accent); color: var(--accent); }
+.filebtn { background: var(--panel-2); border: 1px solid var(--line); border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+.filebtn input { display: none; }
+.shop-summary:empty { display: none; }
+.shop-summary { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
+.buy-line { border-left: 4px solid var(--c); padding-left: 8px; margin-top: 4px; }
+.shop-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: .85em; margin: 8px 0; }
+.shop-legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border: 2px solid var(--c); margin-right: 5px; vertical-align: -1px; }
+.shop-results { list-style: none; padding: 0; margin: 0 0 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 8px; }
+.shop-item { display: flex; gap: 8px; align-items: flex-start; background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 8px; padding: 8px; }
+.shop-item .num { font-weight: 700; color: var(--c); min-width: 1.4em; }
+.shop-item .crop, .shop-item .ref { width: 48px; height: 48px; border-radius: 6px; background: #14121a; flex: none; object-fit: cover; }
+.shop-item .body { min-width: 0; flex: 1; }
+.shop-item .cls, .buy-line .cls { color: var(--c); font-size: .85em; font-weight: 600; }
+.shop-item .row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; }
+.shop-item select { max-width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; font-size: .85em; }
+.shop-preview-wrap { overflow-x: auto; }
+#shop-preview { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); cursor: crosshair; }
+
 /* data */
 textarea { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
