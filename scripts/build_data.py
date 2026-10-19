@@ -102,7 +102,7 @@ def num(s: str):
 
 
 def mount_slugs():
-    xml = fetch(f"{BASE}/sitemaps/aion-2-collections.xml", "sitemap-collections.xml")
+    xml = fetch(f"{BASE}/sitemaps/aion-2-en.xml", "sitemap-aion-2-en.xml")
     slugs = re.findall(r"<loc>https://metabot\.gg/en/aion-2/mounts/([^<]+)</loc>", xml)
     return sorted(set(slugs))
 

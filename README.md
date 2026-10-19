@@ -27,6 +27,7 @@ python scripts/build_data.py --refresh   # 全ページを取り直す（1.2 秒
 python scripts/build_tiles.py world_l_a world_d_a abyss_reshanta_a            # interactive-map の地図から
 python scripts/build_tiles.py --metabot world_l_b world_d_b abyss_reshanta_c abyss_reshanta_d  # MetaBot の全体図から
 python scripts/build_portraits.py   # ショップ確認タブの照合用ポートレート（site/portraits）
+python scripts/build_cubes.py       # ヒドゥンキューブの位置（site/data/cubes.json。PyYAML が必要）
 ```
 
 新しいワールドに湧き点が出たら `site/app.js` の `WORLDS` / `WORLD_PX` に追加する。
@@ -58,5 +59,6 @@ CSS/JS の読み込みに付けた版番号（`?v=`）を更新してから公�
 ## データの出典とライセンス
 
 - ペット・モンスター・湧き位置: [MetaBot.GG](https://metabot.gg/en/aion-2)（AION 2 グローバル版クライアントのデータ）。利用規約により、元ページへのリンク（nofollow なし）を付けて利用している。
+- ヒドゥンキューブの位置: aion2-interactive-map のマーカー（CC BY-NC 4.0）。座標は y が上向きなので反転して使う。
 - 地図画像: [aion2-interactive-map](https://github.com/aion2-interactive-map/aion2-interactive-map)（CC BY-NC 4.0）。そのため本サイトは非営利で運営すること。
 - AION 2 は NCSOFT の商標。本サイトは非公式。
