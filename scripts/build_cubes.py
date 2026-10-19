@@ -1,103 +1,84 @@
-"""ヒドゥンキューブの位置データを作る。
+"""ヒドゥンキューブの出現候補地点のデータを作る。
 
-元データ: aion2-interactive-map (https://github.com/aion2-interactive-map/aion2-interactive-map)
-の public/data/markers/<World>.yaml の hiddenCube マーカー（CC BY-NC 4.0）。
-座標は Leaflet の CRS.Simple（元画像 タイル数 x 1024px、y は下端が 0 で上向き）なので、
-y を反転して、2 の累乗の正方形を 0..1 とする座標（y は下向き）に直す。
-ゾーン名は同リポジトリの地域の境界で判定し、MetaBot.GG の日本語名に置き換える。
+元データ: MetaBot.GG の Hidden Cube ページ（https://metabot.gg/ja_JP/aion-2/hidden-cubes）。
+ページ内の各マップの図に候補地点が点で埋め込まれている（AION 2 グローバル版クライアントのデータ）。
+表の「候補地点」はキューブごとの候補を重複込みで数えた延べ数（合計 3,722）で、重複のない地点は図の点（約 1,160）。
+ゾーン名は、各ゾーンのページの図で同じ位置にある点から決める。
 
 出力: site/data/cubes.json
-使い方: python scripts/build_cubes.py（PyYAML が必要: pip install pyyaml）
+使い方: python scripts/build_cubes.py（取得したページは cache/ に保存し、再実行時は再取得しない。--refresh で取り直す）
 """
 
+import html
 import json
+import math
 import re
+import sys
 import time
-import urllib.request
 from pathlib import Path
 
-import yaml
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import build_data as b  # noqa: E402  fetch・表の読み取りなどを共用する
 
 ROOT = Path(__file__).resolve().parent.parent
-CACHE = ROOT / "cache" / "cubes"
 OUT = ROOT / "site" / "data" / "cubes.json"
-REPO = "https://raw.githubusercontent.com/aion2-interactive-map/aion2-interactive-map/master/public/data"
-METABOT = "https://metabot.gg"
-WORLDS = {"world_l_a": "World_L_A", "world_d_a": "World_D_A"}
-SIDE_PX = 8192  # 8x8 タイル
+PAGE = f"{b.BASE}/{b.LOCALE}/aion-2/hidden-cubes"
+SAME_POINT = 5 / 8192  # ゾーンのページの点と同じ地点とみなす距離（8192px 換算で 5px）
+STYLE = r"(-?[\d.]+)%"
 
 
-def get(url: str, cache: Path, delay: float = 0) -> str:
-    if cache.exists():
-        return cache.read_text(encoding="utf-8")
-    time.sleep(delay)
-    req = urllib.request.Request(url, headers={"User-Agent": "aion2-pet-tracker data builder"})
-    with urllib.request.urlopen(req, timeout=60) as res:
-        body = res.read().decode("utf-8")
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    cache.write_text(body, encoding="utf-8")
-    return body
-
-
-def inside(x: float, y: float, poly) -> bool:
-    hit = False
-    for i in range(len(poly)):
-        x1, y1 = poly[i]
-        x2, y2 = poly[(i + 1) % len(poly)]
-        if (y1 > y) != (y2 > y) and x < (x2 - x1) * (y - y1) / (y2 - y1) + x1:
-            hit = not hit
-    return hit
-
-
-def flat(slug: str) -> str:
-    return slug.replace("-", "").lower()
-
-
-def zone_names():
-    """MetaBot のゾーンの slug（ハイフンなし）→ 日本語名。pets.json にあるものはそれを使い、ないものは都度ページから取る"""
-    names = {}
-    pets = json.loads((ROOT / "site" / "data" / "pets.json").read_text(encoding="utf-8"))
-    for m in pets["monsters"].values():
-        for z in m["zones"]:
-            names[flat(z["zone"])] = z["name"]
-    sitemap = get(f"{METABOT}/sitemaps/aion-2-en.xml", ROOT / "cache" / "sitemap-aion-2-en.xml")
-    slugs = {flat(s): s for s in re.findall(r"/en/aion-2/zones/([^<]+)</loc>", sitemap)}
-    return names, slugs
-
-
-def japanese_zone(region: str, names, slugs):
-    key = region.lower()
-    if key in names:
-        return names[key]
-    if key in slugs:
-        page = get(f"{METABOT}/ja_JP/aion-2/zones/{slugs[key]}", CACHE / "zones" / f"{slugs[key]}.html", delay=1.2)
-        m = re.search(r"<h1[^>]*>(.*?)</h1>", page, re.S)
-        if m:
-            name = re.sub(r"<span[^>]*subtitle.*?</span>|<[^>]+>|<!-- -->", "", m.group(1), flags=re.S).strip()
-            names[key] = name
-            return name
-    print(f"  no Japanese name for {region}")
-    return region
+def figure_points(page: str, kind: str | None = None):
+    """ページ内の地図の図から (world, x, y) を取り出す。x, y は MetaBot のタイル z0 全体を 0..1 とする座標"""
+    out = []
+    for fig in re.findall(r"<figure[^>]*spawnMap.*?</figure>", page, re.S):
+        tile = None
+        for st in re.findall(r'class="[^"]*spawnTile[^"]*" style="([^"]+)"', fig):
+            st = html.unescape(st)
+            m = [re.search(p, st) for p in (r"left:" + STYLE, r"top:" + STYLE, r"width:calc\(" + STYLE, r"height:calc\(" + STYLE)]
+            u = re.search(r"worldmap/([a-z0-9_]+)/(\d+)/(\d+)/(\d+)\.webp", st)
+            if all(m) and u:
+                tile = [float(x[1]) for x in m] + [u[1], int(u[2]), int(u[3]), int(u[4])]
+                break
+        if not tile:
+            continue
+        L, T, W, H, world, z, tx, ty = tile
+        for k, st in re.findall(r'class="[^"]*spawnDot[^"]*" data-kind="([^"]+)" style="([^"]+)"', fig):
+            if kind and k != kind:
+                continue
+            left, top = re.search(r"left:" + STYLE, st), re.search(r"top:" + STYLE, st)
+            out.append((world, (tx + (float(left[1]) - L) / W) / 2**z, (ty + (float(top[1]) - T) / H) / 2**z))
+    return out
 
 
 def main():
-    names, slugs = zone_names()
-    out = {"source": "aion2-interactive-map", "sourceUrl": "https://github.com/aion2-interactive-map/aion2-interactive-map", "worlds": {}}
-    for world, repo_name in WORLDS.items():
-        markers = yaml.safe_load(get(f"{REPO}/markers/{repo_name}.yaml", CACHE / f"{repo_name}.yaml"))["markers"]
-        regions = yaml.safe_load(get(f"{REPO}/regions/{repo_name}.yaml", CACHE / f"regions_{repo_name}.yaml"))["regions"]
-        cubes = []
-        for m in markers:
-            if m.get("subtype") != "hiddenCube":
-                continue
-            region = next((r["name"] for r in regions if any(inside(m["x"], m["y"], b) for b in r["borders"])), None)
-            cubes.append({
-                "x": round(m["x"] / SIDE_PX, 5),
-                "y": round((SIDE_PX - m["y"]) / SIDE_PX, 5),
-                "zone": japanese_zone(region, names, slugs) if region else "",
-            })
-        out["worlds"][world] = cubes
-        print(f"{world}: {len(cubes)} cubes")
+    page = b.main_html(b.fetch(PAGE, "hidden-cubes.html"))
+    cubes = figure_points(page)
+    print(f"cube points: {len(cubes)}")
+
+    # マップごとの表: ゾーン, レベル, キューブ数, 候補地点
+    zones = []
+    for _, rows in b.tables(page):
+        for r in rows:
+            slug = b.slug_of(r[0], "zones")
+            if slug and len(r) >= 4:
+                zones.append({"slug": slug, "name": b.text(r[0]), "candidates": b.num(b.text(r[3]))})
+    print(f"zones: {len(zones)}, candidates (with duplicates): {sum(z['candidates'] or 0 for z in zones)}")
+
+    zone_points = []
+    for i, z in enumerate(zones, 1):
+        zp = b.main_html(b.fetch(f"{b.BASE}/{b.LOCALE}/aion-2/zones/{z['slug']}", f"zones/{z['slug']}.html"))
+        zone_points += [(w, x, y, z["name"]) for w, x, y in figure_points(zp, "poi")]
+        print(f"[{i}/{len(zones)}] {z['name']}", flush=True)
+
+    out = {"source": "MetaBot.GG", "sourceUrl": PAGE, "builtAt": time.strftime("%Y-%m-%d"), "worlds": {}}
+    unknown = 0
+    for w, x, y in cubes:
+        zone = next((n for zw, zx, zy, n in zone_points if zw == w and math.hypot(zx - x, zy - y) <= SAME_POINT), "")
+        unknown += not zone
+        out["worlds"].setdefault(w, []).append({"x": round(x, 5), "y": round(y, 5), "zone": zone})
+    for w, pts in out["worlds"].items():
+        print(f"{w}: {len(pts)}")
+    print(f"points without zone: {unknown}")
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"wrote {OUT}")
 

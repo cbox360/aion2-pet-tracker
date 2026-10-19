@@ -140,6 +140,7 @@ function renderHeader() {
 }
 
 function showTab(tab) {
+  if (tab !== "map" && $("#map-wrap") && isMapFullscreen()) toggleMapFullscreen();
   ui.tab = tab;
   document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === tab)));
   document.querySelectorAll(".tab").forEach((s) => (s.hidden = s.id !== `tab-${tab}`));
@@ -404,7 +405,7 @@ let tileLayer = null;
 let pointLayer = null;
 let hotLayer = null;
 let cubeLayer = null;
-let CUBES = { worlds: {} }; // ヒドゥンキューブの位置（data/cubes.json）
+let CUBES = { worlds: {} }; // ヒドゥンキューブの出現候補地点（data/cubes.json、MetaBot.GG）
 
 const toLatLng = (x, y) => [-y * 256, x * 256];
 
@@ -425,7 +426,7 @@ function ensureMap() {
 }
 
 // Leaflet が位置合わせに transform を使うので、回転は内側の要素にかける
-const cubeIcon = L.divIcon({ className: "cube-icon", html: "<span></span>", iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -6] });
+const cubeIcon = L.divIcon({ className: "cube-icon", html: "<span></span>", iconSize: [12, 12], iconAnchor: [6, 6], popupAnchor: [0, -5] });
 
 function drawCubes() {
   cubeLayer.clearLayers();
@@ -434,7 +435,7 @@ function drawCubes() {
   if (!state.showCubes) return 0;
   for (const c of cubes) {
     L.marker(toLatLng(c.x, c.y), { icon: cubeIcon, keyboard: false })
-      .bindPopup(`<strong>ヒドゥンキューブ</strong><div class="muted">${esc(c.zone)}</div>`)
+      .bindPopup(`<strong>ヒドゥンキューブ候補地</strong><div class="muted">${esc(c.zone)}</div><a href="${METABOT}/hidden-cubes" target="_blank" rel="noopener">MetaBot.GG で詳細</a>`)
       .addTo(cubeLayer);
   }
   return cubes.length;
@@ -448,7 +449,44 @@ function setWorld(world, fit = true) {
   if (tileLayer) map.removeLayer(tileLayer);
   tileLayer = L.tileLayer(`tiles/${world}/{z}/{x}/{y}.webp`, { tileSize: 256, maxNativeZoom: WORLDS[world]?.zoom ?? 4, maxZoom: 6, noWrap: true, bounds }).addTo(map);
   map.setMaxBounds(bounds.pad(0.2));
+  ui.worldBounds = bounds;
   if (fit) map.fitBounds(bounds);
+}
+
+// マップ（操作バーと凡例を含む）の全画面表示。全画面 API がない環境（iPhone の Safari など）では画面いっぱいに広げる
+function isMapFullscreen() {
+  return document.fullscreenElement === $("#map-wrap") || $("#map-wrap").classList.contains("pseudo-fs");
+}
+
+async function toggleMapFullscreen() {
+  const wrap = $("#map-wrap");
+  if (isMapFullscreen()) {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    wrap.classList.remove("pseudo-fs");
+  } else if (wrap.requestFullscreen) {
+    try {
+      await wrap.requestFullscreen();
+    } catch (_) {
+      wrap.classList.add("pseudo-fs");
+    }
+  } else {
+    wrap.classList.add("pseudo-fs");
+  }
+  onMapFullscreenChange();
+}
+
+function onMapFullscreenChange() {
+  const on = isMapFullscreen();
+  $("#map-fullscreen").textContent = on ? "全画面を終了" : "全画面";
+  $("#map-fullscreen").setAttribute("aria-pressed", String(on));
+  document.body.classList.toggle("map-fs-open", $("#map-wrap").classList.contains("pseudo-fs"));
+  if (!map) return;
+  setTimeout(() => {
+    // 地図全体を表示していたときは、新しい大きさに合わせて全体を表示し直す
+    const wasWhole = ui.worldBounds && map.getZoom() <= map.getBoundsZoom(ui.worldBounds) + 0.01;
+    map.invalidateSize();
+    if (wasWhole) map.fitBounds(ui.worldBounds);
+  }, 50);
 }
 
 function renderMap() {
@@ -510,7 +548,7 @@ function drawPoints() {
   $("#legend").innerHTML = TYPES.map((t) => `<span><span class="dot bg-${t.id}"></span> ${t.name}</span>`).join("") +
     (riftMode ? `<span><span class="dot dot-rift"></span> 白枠＝亀裂限定（${FACTION_NAME[state.faction]}側では魂が出ない） ${riftCount}か所</span><span>薄い点＝自陣営でも取れる</span>` : "") +
     `<span>点 ${pts.length}</span>` +
-    (cubes ? `<span><span class="cube-mark"></span> ヒドゥンキューブ ${cubes}か所</span>` : "");
+    (cubes ? `<span><span class="cube-mark"></span> ヒドゥンキューブ候補地 ${cubes}か所</span>` : "");
 }
 
 function monsterPopup(m) {
@@ -699,6 +737,11 @@ function bind() {
     drawPoints();
   });
   $("#show-hot").addEventListener("change", drawPoints);
+  $("#map-fullscreen").addEventListener("click", toggleMapFullscreen);
+  document.addEventListener("fullscreenchange", onMapFullscreenChange);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && $("#map-wrap").classList.contains("pseudo-fs")) toggleMapFullscreen();
+  });
   $("#show-cubes").addEventListener("change", (e) => {
     state.showCubes = e.target.checked;
     saveState();

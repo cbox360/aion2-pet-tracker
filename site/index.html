@@ -6,7 +6,7 @@
 <title>AION2 ペット収集トラッカー</title>
 <meta name="description" content="AION2 のペット（魂）収集状況を記録し、未完了ペットの魂を落とすモンスターの湧き位置と効率のいい狩場を表示します。">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=202610192232">
+<link rel="stylesheet" href="style.css?v=202610192243">
 </head>
 <body>
 <header class="top">
@@ -72,15 +72,18 @@
 
   <!-- マップ -->
   <section id="tab-map" class="tab" hidden>
+   <div id="map-wrap">
     <div class="map-bar">
+      <button type="button" id="map-fullscreen" class="fs-btn" aria-pressed="false">全画面</button>
       <select id="world"></select>
       <span id="map-filter"></span>
       <label class="check"><input type="checkbox" id="show-hot" checked> 密集スポットを表示</label>
-      <label class="check"><input type="checkbox" id="show-cubes" checked> ヒドゥンキューブ</label>
+      <label class="check"><input type="checkbox" id="show-cubes" checked> ヒドゥンキューブ候補地</label>
       <label class="check" id="rift-only-wrap" hidden><input type="checkbox" id="rift-only"> 亀裂限定のみ表示</label>
     </div>
     <div id="map"></div>
     <div class="legend" id="legend"></div>
+   </div>
   </section>
 
   <!-- ショップ確認 -->
@@ -125,13 +128,13 @@
 <footer class="credits">
   <p>ペット・モンスター・湧き位置データ: <a href="https://metabot.gg/en/aion-2">MetaBot.GG</a>（AION 2 グローバル版クライアントのデータ）。各ペット・モンスターの元ページへのリンクも掲載しています。</p>
   <p>ペットのポートレート: <a href="https://metabot.gg/en/aion-2/mounts">MetaBot.GG</a>。</p>
-  <p>ヒドゥンキューブの位置: <a href="https://github.com/aion2-interactive-map/aion2-interactive-map">aion2-interactive-map</a>（CC BY-NC 4.0。ベルテロン・アルトガルドのみ）。</p>
+  <p>ヒドゥンキューブの出現候補地: <a href="https://metabot.gg/en/aion-2/hidden-cubes">MetaBot.GG</a>。</p>
   <p>地図画像: <a href="https://github.com/aion2-interactive-map/aion2-interactive-map">aion2-interactive-map</a>（CC BY-NC 4.0。ベルテロン・アルトガルド・エレシュランタ下層）、<a href="https://metabot.gg/en/aion-2/map">MetaBot.GG</a>（エルテネン・モルヘイム・エレシュランタ中層/表層）。</p>
   <p>AION 2 は NCSOFT の商標です。本サイトは非公式のファンサイトで、NCSOFT・MetaBot.GG とは関係ありません。<span id="built"></span></p>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="app.js?v=202610192232"></script>
-<script src="shop.js?v=202610192232"></script>
+<script src="app.js?v=202610192243"></script>
+<script src="shop.js?v=202610192243"></script>
 </body>
 </html>
