@@ -129,6 +129,8 @@ table.zones { width: 100%; border-collapse: collapse; font-size: .92em; }
 #map-filter:empty { display: none; }
 #map-filter { background: var(--panel-2); border-radius: 6px; padding: 2px 8px; }
 #map { height: min(72vh, 760px); border-radius: 10px; border: 1px solid var(--line); background: #0c0e14; }
+.cube-icon span { display: block; width: 100%; height: 100%; box-sizing: border-box; background: #3fe0d0; border: 2px solid #062a2a; transform: rotate(45deg) scale(.85); border-radius: 2px; box-shadow: 0 0 0 1px rgba(255,255,255,.6); }
+.cube-mark { display: inline-block; width: 9px; height: 9px; background: #3fe0d0; border: 1px solid #062a2a; transform: rotate(45deg); margin: 0 3px; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; color: var(--muted); font-size: .9em; }
 .leaflet-container { font: inherit; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--panel); color: var(--text); }

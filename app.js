@@ -62,7 +62,13 @@ function loadState() {
 function normalizeState(s) {
   const done = { ...(s.done || {}) };
   for (const [slug, n] of Object.entries(s.souls || {})) if (n >= 5) done[slug] = true;
-  return { faction: s.faction === "dark" ? "dark" : "light", done, typeLv: s.typeLv || {}, includeUnreleased: !!s.includeUnreleased };
+  return {
+    faction: s.faction === "dark" ? "dark" : "light",
+    done,
+    typeLv: s.typeLv || {},
+    includeUnreleased: !!s.includeUnreleased,
+    showCubes: s.showCubes !== false,
+  };
 }
 function saveState() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (_) { /* noop */ }
@@ -397,6 +403,8 @@ let map = null;
 let tileLayer = null;
 let pointLayer = null;
 let hotLayer = null;
+let cubeLayer = null;
+let CUBES = { worlds: {} }; // ヒドゥンキューブの位置（data/cubes.json）
 
 const toLatLng = (x, y) => [-y * 256, x * 256];
 
@@ -413,6 +421,23 @@ function ensureMap() {
   map = L.map("map", { crs: L.CRS.Simple, minZoom: 0, maxZoom: 6, zoomSnap: 0.5, attributionControl: false, preferCanvas: true });
   pointLayer = L.layerGroup().addTo(map);
   hotLayer = L.layerGroup().addTo(map);
+  cubeLayer = L.layerGroup().addTo(map);
+}
+
+// Leaflet が位置合わせに transform を使うので、回転は内側の要素にかける
+const cubeIcon = L.divIcon({ className: "cube-icon", html: "<span></span>", iconSize: [14, 14], iconAnchor: [7, 7], popupAnchor: [0, -6] });
+
+function drawCubes() {
+  cubeLayer.clearLayers();
+  $("#show-cubes").checked = state.showCubes;
+  const cubes = CUBES.worlds[ui.world] || [];
+  if (!state.showCubes) return 0;
+  for (const c of cubes) {
+    L.marker(toLatLng(c.x, c.y), { icon: cubeIcon, keyboard: false })
+      .bindPopup(`<strong>ヒドゥンキューブ</strong><div class="muted">${esc(c.zone)}</div>`)
+      .addTo(cubeLayer);
+  }
+  return cubes.length;
 }
 
 function setWorld(world, fit = true) {
@@ -481,9 +506,11 @@ function drawPoints() {
     }
   }
   const riftCount = pts.filter((p) => p.prio).length;
+  const cubes = drawCubes();
   $("#legend").innerHTML = TYPES.map((t) => `<span><span class="dot bg-${t.id}"></span> ${t.name}</span>`).join("") +
     (riftMode ? `<span><span class="dot dot-rift"></span> 白枠＝亀裂限定（${FACTION_NAME[state.faction]}側では魂が出ない） ${riftCount}か所</span><span>薄い点＝自陣営でも取れる</span>` : "") +
-    `<span>点 ${pts.length}</span>`;
+    `<span>点 ${pts.length}</span>` +
+    (cubes ? `<span><span class="cube-mark"></span> ヒドゥンキューブ ${cubes}か所</span>` : "");
 }
 
 function monsterPopup(m) {
@@ -672,6 +699,11 @@ function bind() {
     drawPoints();
   });
   $("#show-hot").addEventListener("change", drawPoints);
+  $("#show-cubes").addEventListener("change", (e) => {
+    state.showCubes = e.target.checked;
+    saveState();
+    drawPoints();
+  });
   $("#map").addEventListener("click", (e) => {
     const b = e.target.closest("[data-goto]");
     if (!b) return;
@@ -689,9 +721,13 @@ function bind() {
 
 // ---------------------------------------------------------------- 起動
 
-fetch("data/pets.json")
-  .then((r) => r.json())
-  .then((data) => {
+Promise.all([
+  fetch("data/pets.json").then((r) => r.json()),
+  // キューブの位置は無くてもほかの機能は動くようにする
+  fetch("data/cubes.json").then((r) => r.json()).catch(() => ({ worlds: {} })),
+])
+  .then(([data, cubes]) => {
+    CUBES = cubes;
     DATA = prepare(data);
     $("#built").textContent = ` データ更新日: ${data.builtAt}`;
     bind();
