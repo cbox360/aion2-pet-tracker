@@ -169,6 +169,31 @@ body.map-fs-open { overflow: hidden; }
 .shop-preview-wrap { overflow-x: auto; }
 #shop-preview { max-width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--line); cursor: crosshair; }
 
+/* skins */
+.progress-line { margin: 0 0 8px; font-weight: 600; }
+#skin-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.skin-series { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+.skin-series > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 8px 12px; cursor: pointer; }
+.skin-series.complete { opacity: .6; }
+.series-name { font-weight: 600; }
+.series-places { flex-basis: 100%; color: var(--muted); font-size: .85em; }
+.series-progress { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.skin-series.complete .series-progress { color: var(--done); }
+.series-body { padding: 0 12px 10px; }
+.series-how { color: var(--muted); font-size: .9em; margin: 0 0 6px; }
+.skin-parts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+.skin-part { background: var(--panel-2); border-radius: 6px; padding: 8px 10px; }
+.skin-part.done .part-name { text-decoration: line-through; color: var(--muted); }
+.part-name { font-weight: 600; }
+.gear-head { color: var(--muted); font-size: .8em; margin: 6px 0 2px; }
+ul.gear { list-style: none; margin: 0; padding: 0; font-size: .88em; }
+ul.gear li { display: flex; gap: 6px; align-items: flex-start; padding: 3px 0; border-top: 1px dashed var(--line); }
+.gear-icon { width: 28px; height: 28px; border-radius: 4px; background: #14121a; flex: none; }
+.en-note { font-size: .78em; }
+ul.gear .where { color: var(--muted); font-size: .92em; }
+.more summary { cursor: pointer; color: var(--muted); font-size: .85em; margin-top: 2px; }
+.no-gear { font-size: .85em; margin-top: 4px; }
+
 /* data */
 textarea { width: 100%; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 .buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

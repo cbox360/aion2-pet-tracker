@@ -68,6 +68,7 @@ function normalizeState(s) {
     typeLv: s.typeLv || {},
     includeUnreleased: !!s.includeUnreleased,
     showCubes: s.showCubes !== false,
+    skins: s.skins && typeof s.skins === "object" ? s.skins : {}, // 収集済みの外形（解放アイテムのページ名 → true）
   };
 }
 function saveState() {
@@ -148,6 +149,7 @@ function showTab(tab) {
   if (tab === "spots") renderSpots();
   if (tab === "map") renderMap();
   if (tab === "shop") renderShop();
+  if (tab === "skins") renderSkins();
   if (tab === "data") $("#backup").value = "";
 }
 
@@ -775,6 +777,7 @@ Promise.all([
     $("#built").textContent = ` データ更新日: ${data.builtAt}`;
     bind();
     bindShop();
+    bindSkins();
     renderAll();
   })
   .catch((e) => {
