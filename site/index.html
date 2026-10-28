@@ -6,7 +6,7 @@
 <title>AION2 ペット収集トラッカー</title>
 <meta name="description" content="AION2 のペット（魂）収集状況を記録し、未完了ペットの魂を落とすモンスターの湧き位置と効率のいい狩場を表示します。">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="style.css?v=202610192243">
+<link rel="stylesheet" href="style.css?v=202610290337">
 </head>
 <body>
 <header class="top">
@@ -30,6 +30,7 @@
   <button type="button" role="tab" data-tab="spots">おすすめ狩場</button>
   <button type="button" role="tab" data-tab="map">マップ</button>
   <button type="button" role="tab" data-tab="shop">ショップ確認</button>
+  <button type="button" role="tab" data-tab="skins">外形</button>
   <button type="button" role="tab" data-tab="data">データ管理</button>
 </nav>
 
@@ -111,6 +112,25 @@
     <p class="hint">判別できなかったペットは、上の画像でそのアイコンをクリックすると追加で判別します。間違っているときは候補から選び直してください。</p>
   </section>
 
+  <!-- 外形 -->
+  <section id="tab-skins" class="tab" hidden>
+    <p class="hint">外形をシリーズごとにまとめ、各パーツが「どの装備を分解（抽出）すると手に入るか」と、その装備の入手場所を表示します。装備の名前と外形の名前は違うので、ここで対応を確認してください。集めたパーツにチェックを入れると記録されます。</p>
+    <p class="progress-line" id="skin-summary"></p>
+    <div class="filters">
+      <input type="search" id="skin-q" placeholder="シリーズ名・装備名・ダンジョン名で検索（例：炎の神殿）">
+      <div class="chips" id="skin-kinds"></div>
+      <label class="check"><input type="checkbox" id="skin-todo" checked> 未完成のシリーズのみ</label>
+      <div class="where-filter" role="radiogroup" aria-label="入手方法">
+        <span class="where-label">入手方法</span>
+        <label><input type="radio" name="skin-how" value="all" checked> すべて</label>
+        <label><input type="radio" name="skin-how" value="gear"> 装備の分解で取れる</label>
+        <label><input type="radio" name="skin-how" value="other"> 装備からは出ない</label>
+      </div>
+      <span class="muted" id="skin-count"></span>
+    </div>
+    <div id="skin-list"></div>
+  </section>
+
   <!-- データ管理 -->
   <section id="tab-data" class="tab" hidden>
     <h2>バックアップ</h2>
@@ -127,6 +147,7 @@
 
 <footer class="credits">
   <p>ペット・モンスター・湧き位置データ: <a href="https://metabot.gg/en/aion-2">MetaBot.GG</a>（AION 2 グローバル版クライアントのデータ）。各ペット・モンスターの元ページへのリンクも掲載しています。</p>
+  <p>外形と装備の対応: AION 2 公式サイトのアイテム情報。外形・装備の日本語名と入手場所: <a href="https://metabot.gg/en/aion-2/skins">MetaBot.GG</a>。</p>
   <p>ペットのポートレート: <a href="https://metabot.gg/en/aion-2/mounts">MetaBot.GG</a>。</p>
   <p>ヒドゥンキューブの出現候補地: <a href="https://metabot.gg/en/aion-2/hidden-cubes">MetaBot.GG</a>。</p>
   <p>地図画像: <a href="https://github.com/aion2-interactive-map/aion2-interactive-map">aion2-interactive-map</a>（CC BY-NC 4.0。ベルテロン・アルトガルド・エレシュランタ下層）、<a href="https://metabot.gg/en/aion-2/map">MetaBot.GG</a>（エルテネン・モルヘイム・エレシュランタ中層/表層）。</p>
@@ -134,7 +155,8 @@
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="app.js?v=202610192243"></script>
-<script src="shop.js?v=202610192243"></script>
+<script src="app.js?v=202610290337"></script>
+<script src="shop.js?v=202610290337"></script>
+<script src="skins.js?v=202610290337"></script>
 </body>
 </html>
